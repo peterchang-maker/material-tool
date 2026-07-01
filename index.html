@@ -5,6 +5,7 @@
 <title>天堂M 素材成效分析工具</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{
     --bg:#f4f3ef; --surface:#ffffff; --border:#e3e0d8; --border-strong:#cfcabb;
@@ -156,6 +157,7 @@
         <table>
           <thead>
             <tr>
+              <th style="cursor:default;">縮圖</th>
               <th data-key="渠道">渠道</th>
               <th data-key="格式">格式</th>
               <th data-key="素材切角">切角</th>
@@ -231,6 +233,8 @@
 <script>
 let angleChartInst=null, angleCpaChartInst=null, spChartInst=null;
 let sortKey='點擊', sortDir=-1;
+let rawBuffer=null; // 儲存原始 ArrayBuffer 供圖片解析使用
+let imageMap={}; // rowIndex(0-based) -> {dataUrl}
 const uploadBox = document.getElementById('uploadBox');
 const fileInput = document.getElementById('fileInput');
 const fileBar = document.getElementById('fileBar');
@@ -251,7 +255,7 @@ fileInput.addEventListener('change', e=>{
   if(e.target.files.length) handleFile(e.target.files[0]);
 });
 document.getElementById('resetBtn').addEventListener('click', ()=>{
-  workbook=null; RAW=[];
+  workbook=null; RAW=[]; rawBuffer=null; imageMap={};
   uploadedImages=[]; aiResults={};
   uploadBox.style.display='block';
   fileBar.style.display='none';
@@ -273,6 +277,7 @@ function handleFile(file){
   errArea.innerHTML='';
   const reader = new FileReader();
   reader.onload = e=>{
+    rawBuffer = e.target.result; // 保存原始buffer供圖片解析用
     try{
       workbook = XLSX.read(e.target.result, {type:'array'});
     }catch(err){
@@ -369,6 +374,7 @@ function parseSheet(sheetName){
     const parsed = parseMaterialName(nameVal);
     out.push({
       渠道: currentChannel,
+      _excelRow: i, // 記錄Excel 0-based列號供圖片對應
       ...parsed,
       費用: cleanMoney(idx.cost>=0 ? r[idx.cost] : null),
       預約次數: idx.conv>=0 ? r[idx.conv] : null,
@@ -388,7 +394,13 @@ function parseSheet(sheetName){
 
   RAW = out;
   dashboard.style.display='block';
+  imageMap = {};
   renderAll();
+  // 非同步解析Excel內嵌圖片
+  extractExcelImages(rawBuffer, sheetName).then(map=>{
+    imageMap = map;
+    renderTable(); // 更新明細表顯示縮圖
+  }).catch(()=>{});
 }
 
 function fmtPct(x){ return x==null ? '-' : (x*100).toFixed(2) + '%'; }
@@ -425,7 +437,112 @@ function getContextChannels(){
   return allChannels;
 }
 
+// ── Excel 內嵌圖片解析 ──────────────────────────────────────
+async function extractExcelImages(buffer, targetSheetName){
+  if(!buffer || typeof JSZip === 'undefined') return {};
+  const zip = await JSZip.loadAsync(buffer);
+  const result = {}; // sheetRowIndex(0-based) -> dataUrl
+
+  // 找出 targetSheetName 對應的 sheet 檔案編號
+  const wbXml = await zip.files['xl/workbook.xml'].async('text');
+  const wbDoc = new DOMParser().parseFromString(wbXml, 'text/xml');
+  let sheetFileId = null;
+  wbDoc.querySelectorAll('sheet').forEach(s=>{
+    if(s.getAttribute('name') === targetSheetName){
+      const rId = s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id')
+                || s.getAttribute('r:id');
+      sheetFileId = rId;
+    }
+  });
+  if(!sheetFileId) return {};
+
+  // 透過 workbook.xml.rels 找到 sheet 的實際檔案路徑
+  const wbRelsXml = await zip.files['xl/_rels/workbook.xml.rels'].async('text');
+  const wbRelsDoc = new DOMParser().parseFromString(wbRelsXml, 'text/xml');
+  let sheetFilePath = null;
+  wbRelsDoc.querySelectorAll('Relationship').forEach(r=>{
+    if(r.getAttribute('Id') === sheetFileId){
+      sheetFilePath = 'xl/' + r.getAttribute('Target').replace(/^\.\.\//, '').replace(/^xl\//, '');
+    }
+  });
+  if(!sheetFilePath || !zip.files[sheetFilePath]) return {};
+
+  // 找該 sheet 的 drawing 關聯
+  const sheetFileName = sheetFilePath.split('/').pop();
+  const sheetRelsPath = sheetFilePath.replace('worksheets/', 'worksheets/_rels/') + '.rels';
+  if(!zip.files[sheetRelsPath]) return {};
+
+  const sheetRelsXml = await zip.files[sheetRelsPath].async('text');
+  const sheetRelsDoc = new DOMParser().parseFromString(sheetRelsXml, 'text/xml');
+  let drawingPath = null;
+  sheetRelsDoc.querySelectorAll('Relationship').forEach(r=>{
+    if(r.getAttribute('Type') && r.getAttribute('Type').includes('drawing')){
+      const target = r.getAttribute('Target');
+      drawingPath = target.startsWith('../')
+        ? 'xl/' + target.slice(3)
+        : 'xl/worksheets/' + target;
+    }
+  });
+  if(!drawingPath || !zip.files[drawingPath]) return {};
+
+  // 解析 drawing XML 取得圖片錨點（列號）與 rId
+  const drawingXml = await zip.files[drawingPath].async('text');
+  const drawingDoc = new DOMParser().parseFromString(drawingXml, 'text/xml');
+
+  // 解析 drawing rels
+  const drawingName = drawingPath.split('/').pop();
+  const drawingRelsPath = drawingPath.replace('drawings/', 'drawings/_rels/') + '.rels';
+  if(!zip.files[drawingRelsPath]) return {};
+
+  const drawingRelsXml = await zip.files[drawingRelsPath].async('text');
+  const drawingRelsDoc = new DOMParser().parseFromString(drawingRelsXml, 'text/xml');
+  const rIdToMedia = {};
+  drawingRelsDoc.querySelectorAll('Relationship').forEach(r=>{
+    rIdToMedia[r.getAttribute('Id')] = r.getAttribute('Target');
+  });
+
+  const R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const anchors = [...drawingDoc.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing','twoCellAnchor'),
+                   ...drawingDoc.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing','oneCellAnchor')];
+
+  for(const anchor of anchors){
+    const fromRowEl = anchor.querySelector ? anchor.querySelector('from > row')
+      : anchor.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing','row')[0];
+    if(!fromRowEl) continue;
+    const rowIdx = parseInt(fromRowEl.textContent); // 0-based Excel 列號
+
+    // 找 blip 的 r:embed
+    let rId = null;
+    const blips = anchor.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main','blip');
+    if(blips.length > 0){
+      rId = blips[0].getAttributeNS(R_NS,'embed') || blips[0].getAttribute('r:embed');
+    }
+    if(!rId || !rIdToMedia[rId]) continue;
+
+    const mediaRelTarget = rIdToMedia[rId];
+    const mediaPath = mediaRelTarget.startsWith('../')
+      ? 'xl/' + mediaRelTarget.slice(3)
+      : 'xl/drawings/' + mediaRelTarget;
+
+    if(!zip.files[mediaPath]) continue;
+
+    const imgB64 = await zip.files[mediaPath].async('base64');
+    const ext = mediaPath.split('.').pop().toLowerCase();
+    const mime = {png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', webp:'image/webp'}[ext] || 'image/png';
+    result[rowIdx] = `data:${mime};base64,${imgB64}`;
+  }
+
+  return result;
+}
+
+function getImageForRow(rowIndexInSheet){
+  // Excel 列號0-based，直接查map
+  return imageMap[rowIndexInSheet] || null;
+}
+// ────────────────────────────────────────────────────────────
+
 function renderAll(){
+
   const channelSet = getContextChannels();
   const perfData = channelSet.length ? RAW.filter(d=>channelSet.includes(d.渠道)) : RAW;
 
@@ -441,13 +558,38 @@ function renderAll(){
   const avgCTR = totalImpr ? totalClick/totalImpr : 0;
 
   const angleAgg = aggBy('素材切角', perfData).sort((a,b)=>b.ctr-a.ctr);
-  const bestAngleKey = angleAgg.length ? angleAgg[0].key : '-';
+
+  // 綜合指標：CTR排名 + CPA排名（各佔50%），分數越低越好
+  const angleWithScore = (() => {
+    const arr = [...angleAgg];
+    // CTR 由高到低排名（第1名得1分）
+    const ctrRanked = [...arr].sort((a,b)=>b.ctr-a.ctr);
+    // CPA 由低到高排名（第1名得1分），沒有CPA資料的排最後
+    const cpaRanked = [...arr].sort((a,b)=>{
+      if(a.cpa==null && b.cpa==null) return 0;
+      if(a.cpa==null) return 1;
+      if(b.cpa==null) return -1;
+      return a.cpa - b.cpa;
+    });
+    return arr.map(item=>({
+      ...item,
+      ctrRank: ctrRanked.findIndex(x=>x.key===item.key) + 1,
+      cpaRank: cpaRanked.findIndex(x=>x.key===item.key) + 1,
+      score: (ctrRanked.findIndex(x=>x.key===item.key) + 1) * 0.5
+            + (cpaRanked.findIndex(x=>x.key===item.key) + 1) * 0.5
+    })).sort((a,b)=>a.score-b.score);
+  })();
+
+  const bestAngleKey = angleWithScore.length ? angleWithScore[0].key : '-';
+  const bestAngleHint = angleWithScore.length
+    ? `CTR排名第${angleWithScore[0].ctrRank}・CPA排名第${angleWithScore[0].cpaRank}`
+    : '';
 
   document.getElementById('summaryCards').innerHTML = `
     <div class="card"><p class="label">素材總數</p><p class="value">${totalMaterials}</p></div>
     <div class="card"><p class="label">${ctxLabel}平均CTR</p><p class="value">${fmtPct(avgCTR)}</p></div>
     <div class="card"><p class="label">${ctxLabel}總花費</p><p class="value">${fmtMoney(totalCost)}</p></div>
-    <div class="card"><p class="label">表現最佳切角</p><p class="value">${bestAngleKey}</p></div>
+    <div class="card"><p class="label">表現最佳切角 <span style="font-size:10px; color:var(--text-muted);">CTR+CPA綜合</span></p><p class="value">${bestAngleKey}</p><p style="font-size:11px; color:var(--text-muted); margin:4px 0 0;">${bestAngleHint}</p></div>
   `;
 
   if(angleChartInst) angleChartInst.destroy();
@@ -465,11 +607,11 @@ function renderAll(){
   });
 
   const insightsEl = document.getElementById('angleInsights');
-  if(angleAgg.length>=2){
-    const best = angleAgg[0], worst = angleAgg[angleAgg.length-1];
+  if(angleWithScore.length>=2){
+    const best = angleWithScore[0], worst = angleWithScore[angleWithScore.length-1];
     insightsEl.innerHTML = `
-      <div class="insight"><b>${best.key}</b> 點擊效率最高，CTR 達 ${fmtPct(best.ctr)}，建議優先擴大此切角的素材產出與預算配置。</div>
-      <div class="insight bad"><b>${worst.key}</b> CTR 偏低（${fmtPct(worst.ctr)}），建議結合具體福利或行動誘因再優化。</div>
+      <div class="insight"><b>${best.key}</b> 綜合表現最佳（CTR 排名第${best.ctrRank}、CPA 排名第${best.cpaRank}），點擊效率與轉換成本兼顧，建議優先擴大預算配置。</div>
+      <div class="insight bad"><b>${worst.key}</b> 綜合表現偏弱（CTR 排名第${worst.ctrRank}、CPA 排名第${worst.cpaRank}），建議結合具體福利或行動誘因再優化。</div>
     `;
   } else {
     insightsEl.innerHTML = '';
@@ -513,8 +655,14 @@ function renderTable(){
     if(typeof av==='number' && typeof bv==='number') return (av-bv)*sortDir;
     return String(av||'').localeCompare(String(bv||''))*sortDir;
   });
-  document.getElementById('tableBody').innerHTML = rows.length ? rows.map(d=>`
+  document.getElementById('tableBody').innerHTML = rows.length ? rows.map(d=>{
+    const thumb = d._excelRow != null ? getImageForRow(d._excelRow) : null;
+    const thumbHtml = thumb
+      ? `<img src="${thumb}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;display:block;">`
+      : `<div style="width:48px;height:48px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text-muted);">—</div>`;
+    return `
     <tr>
+      <td>${thumbHtml}</td>
       <td>${d.渠道||'-'}</td>
       <td>${d.格式||'-'}</td>
       <td><span class="tag ${tagClass(d.素材切角)}">${d.素材切角||'-'}</span></td>
@@ -525,7 +673,7 @@ function renderTable(){
       <td>${fmtInt(d.曝光)}</td>
       <td>${d.CPM!=null?'$'+Math.round(d.CPM):'-'}</td>
     </tr>
-  `).join('') : `<tr><td colspan="9" class="empty">沒有符合條件的素材</td></tr>`;
+  `}).join('') : `<tr><td colspan="10" class="empty">沒有符合條件的素材</td></tr>`;
 }
 
 document.getElementById('contextSelect').addEventListener('change', renderAll);

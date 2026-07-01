@@ -401,7 +401,7 @@ function parseSheet(sheetName){
   imageMap = {};
   renderAll();
   // 非同步從Excel擷取所有圖片 → 自動填入AI分析區
-  extractAllMedia(rawBuffer).then(images=>{
+  extractAllMedia(rawBuffer, sheetName).then(images=>{
     if(!images.length) return;
     // 合併進uploadedImages（避免覆蓋已手動上傳的）
     const existingNames = new Set(uploadedImages.map(i=>i.name));
@@ -448,16 +448,133 @@ function getContextChannels(){
   return allChannels;
 }
 
-// ── Excel 內嵌圖片擷取 ──────────────────────────────────────
-async function extractAllMedia(buffer){
+// ── Excel 內嵌圖片擷取（含素材名稱配對）───────────────────
+async function extractAllMedia(buffer, sheetName){
   if(!buffer || typeof JSZip === 'undefined') return [];
   let zip;
   try{ zip = await JSZip.loadAsync(buffer); }catch(e){ return []; }
 
   const VALID_EXT = ['png','jpg','jpeg','gif','webp'];
   const MIME = {png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', webp:'image/webp'};
-  const images = [];
+  const COL_LETTER = {0:'A',1:'B',2:'C',3:'D',4:'E',5:'F',6:'G',7:'H'};
 
+  // sheetName 直接由呼叫端傳入，不再讀 DOM（避免競態條件）
+
+  // Step1: workbook.xml → sheet rId
+  if(!zip.files['xl/workbook.xml']) return await fallbackMedia(zip, VALID_EXT, MIME);
+  const wbXml = await zip.files['xl/workbook.xml'].async('text');
+  const sheetRIdMatch = wbXml.match(new RegExp(`name="${sheetName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}"[^>]+r:id="([^"]+)"`));
+  if(!sheetRIdMatch) return await fallbackMedia(zip, VALID_EXT, MIME);
+  const sheetRId = sheetRIdMatch[1];
+
+  // Step2: workbook rels → sheet 檔案路徑
+  if(!zip.files['xl/_rels/workbook.xml.rels']) return await fallbackMedia(zip, VALID_EXT, MIME);
+  const wbRels = await zip.files['xl/_rels/workbook.xml.rels'].async('text');
+  const sheetTargetMatch = wbRels.match(new RegExp(`Id="${sheetRId}"[^>]+Target="([^"]+)"`));
+  if(!sheetTargetMatch) return await fallbackMedia(zip, VALID_EXT, MIME);
+  const sheetFilePath = 'xl/' + sheetTargetMatch[1].replace(/^\.\.\//, '').replace(/^xl\//, '');
+  if(!zip.files[sheetFilePath]) return await fallbackMedia(zip, VALID_EXT, MIME);
+
+  // Step3: sheet rels → drawing 路徑
+  const sheetRelsPath = sheetFilePath.replace('worksheets/','worksheets/_rels/') + '.rels';
+  if(!zip.files[sheetRelsPath]) return await fallbackMedia(zip, VALID_EXT, MIME);
+  const sheetRels = await zip.files[sheetRelsPath].async('text');
+  const drawingTargetMatch = sheetRels.match(/Type="[^"]*drawing[^"]*"[^>]+Target="([^"]+)"/);
+  if(!drawingTargetMatch) return await fallbackMedia(zip, VALID_EXT, MIME);
+  const drawingTarget = drawingTargetMatch[1];
+  const drawingPath = drawingTarget.startsWith('../') ? 'xl/'+drawingTarget.slice(3) : 'xl/worksheets/'+drawingTarget;
+  if(!zip.files[drawingPath]) return await fallbackMedia(zip, VALID_EXT, MIME);
+
+  // Step4: drawing rels → rId → media 檔名
+  const drawingFolder = drawingPath.substring(0, drawingPath.lastIndexOf('/')+1);
+  const drawingName = drawingPath.split('/').pop();
+  const drawingRelsPath = drawingFolder + '_rels/' + drawingName + '.rels';
+  if(!zip.files[drawingRelsPath]) return await fallbackMedia(zip, VALID_EXT, MIME);
+  const drawingRels = await zip.files[drawingRelsPath].async('text');
+  const rIdToMedia = {};
+  for(const m of drawingRels.matchAll(/Id="([^"]+)"[^>]*Target="([^"]+)"/g)){
+    rIdToMedia[m[1]] = m[2].split('/').pop();
+  }
+
+  // Step5: sheet XML → (row, col_letter) → 儲存格文字
+  const sheetXml = await zip.files[sheetFilePath].async('text');
+  let sharedStrings = [];
+  if(zip.files['xl/sharedStrings.xml']){
+    const ssXml = await zip.files['xl/sharedStrings.xml'].async('text');
+    sharedStrings = [...ssXml.matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map(m=>m[1]);
+  }
+  const cellText = {};
+  for(const rowMatch of sheetXml.matchAll(/<row r="(\d+)"[^>]*>(.*?)<\/row>/gs)){
+    const rowN = parseInt(rowMatch[1]);
+    for(const cellMatch of rowMatch[2].matchAll(/<c r="([A-Z]+)(\d+)"[^>]*t="s"[^>]*><v>(\d+)<\/v>/g)){
+      cellText[`${cellMatch[1]}${rowMatch[1]}`] = sharedStrings[parseInt(cellMatch[3])] || '';
+    }
+    // 也抓行內字串（非 sharedStrings）
+    for(const cellMatch of rowMatch[2].matchAll(/<c r="([A-Z]+)(\d+)"(?![^>]*t=)[^>]*><v>([^<]+)<\/v>/g)){
+      // 數字欄位略過
+    }
+  }
+
+  // Step6: drawing XML → 每個 anchor 的 row, col, rId
+  const drawingXml = await zip.files[drawingPath].async('text');
+  const images = [];
+  for(const anchor of drawingXml.matchAll(/<xdr:(?:one|two)CellAnchor>([\s\S]*?)<\/xdr:(?:one|two)CellAnchor>/g)){
+    const body = anchor[1];
+    const rowM = body.match(/<xdr:from>[\s\S]*?<xdr:row>(\d+)<\/xdr:row>/);
+    const colM = body.match(/<xdr:from><xdr:col>(\d+)<\/xdr:col>/);
+    const ridM = body.match(/r:embed="([^"]+)"/);
+    if(!rowM || !ridM) continue;
+
+    const anchorRow = parseInt(rowM[1]);
+    const anchorCol = parseInt(colM ? colM[1] : 0);
+    const mediaFile = rIdToMedia[ridM[1]];
+    if(!mediaFile) continue;
+    const ext = mediaFile.split('.').pop().toLowerCase();
+    if(!VALID_EXT.includes(ext)) continue;
+
+    const mediaPath = 'xl/media/' + mediaFile;
+    if(!zip.files[mediaPath]) continue;
+    const b64 = await zip.files[mediaPath].async('base64');
+    const dataUrl = `data:${MIME[ext]||'image/jpeg'};base64,${b64}`;
+
+    // 嘗試從 row+offset, col_letter 取素材名稱
+    const colLetter = COL_LETTER[anchorCol] || 'A';
+    let materialName = null;
+    for(const offset of [2,1,3,0,-1]){
+      const key = `${colLetter}${anchorRow+offset}`;
+      if(cellText[key] && cellText[key].includes('_')){
+        materialName = cellText[key].trim();
+        break;
+      }
+    }
+
+    // 從素材名稱拆出賣點（第4段 _ 分割）
+    let sellingPoint = null;
+    if(materialName){
+      const parts = materialName.split('_');
+      sellingPoint = parts[3] ? parts[3].trim() : null;
+    }
+
+    // 配對 RAW 成效資料
+    let matchedRow = null;
+    if(sellingPoint){
+      matchedRow = RAW.find(d=>d.賣點 && d.賣點.trim()===sellingPoint)
+                || RAW.find(d=>d.賣點 && sellingPoint.includes(d.賣點.trim()))
+                || null;
+    }
+
+    images.push({
+      name: materialName || mediaFile,
+      dataUrl,
+      matchedRow
+    });
+  }
+
+  return images.length ? images : await fallbackMedia(zip, VALID_EXT, MIME);}
+
+async function fallbackMedia(zip, VALID_EXT, MIME){
+  // 備用：直接掃 xl/media/，不做素材名稱配對
+  const images = [];
   for(const [path, file] of Object.entries(zip.files)){
     if(!path.startsWith('xl/media/') || file.dir) continue;
     const ext = path.split('.').pop().toLowerCase();
@@ -473,12 +590,13 @@ async function downloadImagesAsZip(images){
   const zip = new JSZip();
   images.forEach(img=>{
     const b64 = img.dataUrl.split(',')[1];
-    zip.file(img.name, b64, {base64:true});
+    const filename = img.name.includes('.') ? img.name : img.name + '.jpg';
+    zip.file(filename, b64, {base64:true});
   });
   const blob = await zip.generateAsync({type:'blob'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = '素材圖片包.zip'; a.click();
+  a.href=url; a.download='素材圖片包.zip'; a.click();
   setTimeout(()=>URL.revokeObjectURL(url), 5000);
 }
 // ────────────────────────────────────────────────────────────

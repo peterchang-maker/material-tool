@@ -157,7 +157,6 @@
         <table>
           <thead>
             <tr>
-              <th style="cursor:default;">縮圖</th>
               <th data-key="渠道">渠道</th>
               <th data-key="格式">格式</th>
               <th data-key="素材切角">切角</th>
@@ -176,6 +175,11 @@
 
     <section>
       <h2>AI 視覺特徵分析（透過 Gemini）</h2>
+
+      <div id="excelImgBar" style="display:none; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; padding:10px 14px; background:var(--teal-bg); border-radius:8px; font-size:13px; color:var(--teal);">
+        <span id="excelImgInfo"></span>
+        <button class="primaryBtn" id="downloadImgZipBtn" style="height:28px; font-size:12px; padding:0 12px;">下載圖片包（.zip）</button>
+      </div>
       <p class="sub" style="margin:0 0 14px;">這個工具不直接呼叫 AI API，而是幫你產生 Prompt，你貼到 Gemini 視窗、上傳圖片取得結果後，再把結果貼回這裡合併進圖表與洞察。標籤涵蓋色調、人物類型（含AI生成判斷）、人物大小占比、動作姿態、表情、構圖密度、倒數/數字標示、CTA明確度、文字資訊量等九個維度。檔名建議包含賣點關鍵字（如「coupon倒數沙漏」）以利自動配對。</p>
 
       <div class="imgUpload" id="imgUpload">
@@ -257,6 +261,7 @@ fileInput.addEventListener('change', e=>{
 document.getElementById('resetBtn').addEventListener('click', ()=>{
   workbook=null; RAW=[]; rawBuffer=null; imageMap={};
   uploadedImages=[]; aiResults={};
+  document.getElementById('excelImgBar').style.display='none';
   uploadBox.style.display='block';
   fileBar.style.display='none';
   sheetRow.style.display='none';
@@ -374,7 +379,6 @@ function parseSheet(sheetName){
     const parsed = parseMaterialName(nameVal);
     out.push({
       渠道: currentChannel,
-      _excelRow: i, // 記錄Excel 0-based列號供圖片對應
       ...parsed,
       費用: cleanMoney(idx.cost>=0 ? r[idx.cost] : null),
       預約次數: idx.conv>=0 ? r[idx.conv] : null,
@@ -396,10 +400,17 @@ function parseSheet(sheetName){
   dashboard.style.display='block';
   imageMap = {};
   renderAll();
-  // 非同步解析Excel內嵌圖片
-  extractExcelImages(rawBuffer, sheetName).then(map=>{
-    imageMap = map;
-    renderTable(); // 更新明細表顯示縮圖
+  // 非同步從Excel擷取所有圖片 → 自動填入AI分析區
+  extractAllMedia(rawBuffer).then(images=>{
+    if(!images.length) return;
+    // 合併進uploadedImages（避免覆蓋已手動上傳的）
+    const existingNames = new Set(uploadedImages.map(i=>i.name));
+    images.forEach(img=>{ if(!existingNames.has(img.name)) uploadedImages.push(img); });
+    renderImgGrid();
+    // 顯示擷取狀態列
+    const bar = document.getElementById('excelImgBar');
+    document.getElementById('excelImgInfo').textContent = `已從 Excel 擷取 ${images.length} 張素材圖片，並自動載入下方 AI 分析區塊`;
+    bar.style.display='flex';
   }).catch(()=>{});
 }
 
@@ -437,107 +448,38 @@ function getContextChannels(){
   return allChannels;
 }
 
-// ── Excel 內嵌圖片解析 ──────────────────────────────────────
-async function extractExcelImages(buffer, targetSheetName){
-  if(!buffer || typeof JSZip === 'undefined') return {};
-  const zip = await JSZip.loadAsync(buffer);
-  const result = {}; // sheetRowIndex(0-based) -> dataUrl
+// ── Excel 內嵌圖片擷取 ──────────────────────────────────────
+async function extractAllMedia(buffer){
+  if(!buffer || typeof JSZip === 'undefined') return [];
+  let zip;
+  try{ zip = await JSZip.loadAsync(buffer); }catch(e){ return []; }
 
-  // 找出 targetSheetName 對應的 sheet 檔案編號
-  const wbXml = await zip.files['xl/workbook.xml'].async('text');
-  const wbDoc = new DOMParser().parseFromString(wbXml, 'text/xml');
-  let sheetFileId = null;
-  wbDoc.querySelectorAll('sheet').forEach(s=>{
-    if(s.getAttribute('name') === targetSheetName){
-      const rId = s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id')
-                || s.getAttribute('r:id');
-      sheetFileId = rId;
-    }
-  });
-  if(!sheetFileId) return {};
+  const VALID_EXT = ['png','jpg','jpeg','gif','webp'];
+  const MIME = {png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', webp:'image/webp'};
+  const images = [];
 
-  // 透過 workbook.xml.rels 找到 sheet 的實際檔案路徑
-  const wbRelsXml = await zip.files['xl/_rels/workbook.xml.rels'].async('text');
-  const wbRelsDoc = new DOMParser().parseFromString(wbRelsXml, 'text/xml');
-  let sheetFilePath = null;
-  wbRelsDoc.querySelectorAll('Relationship').forEach(r=>{
-    if(r.getAttribute('Id') === sheetFileId){
-      sheetFilePath = 'xl/' + r.getAttribute('Target').replace(/^\.\.\//, '').replace(/^xl\//, '');
-    }
-  });
-  if(!sheetFilePath || !zip.files[sheetFilePath]) return {};
-
-  // 找該 sheet 的 drawing 關聯
-  const sheetFileName = sheetFilePath.split('/').pop();
-  const sheetRelsPath = sheetFilePath.replace('worksheets/', 'worksheets/_rels/') + '.rels';
-  if(!zip.files[sheetRelsPath]) return {};
-
-  const sheetRelsXml = await zip.files[sheetRelsPath].async('text');
-  const sheetRelsDoc = new DOMParser().parseFromString(sheetRelsXml, 'text/xml');
-  let drawingPath = null;
-  sheetRelsDoc.querySelectorAll('Relationship').forEach(r=>{
-    if(r.getAttribute('Type') && r.getAttribute('Type').includes('drawing')){
-      const target = r.getAttribute('Target');
-      drawingPath = target.startsWith('../')
-        ? 'xl/' + target.slice(3)
-        : 'xl/worksheets/' + target;
-    }
-  });
-  if(!drawingPath || !zip.files[drawingPath]) return {};
-
-  // 解析 drawing XML 取得圖片錨點（列號）與 rId
-  const drawingXml = await zip.files[drawingPath].async('text');
-  const drawingDoc = new DOMParser().parseFromString(drawingXml, 'text/xml');
-
-  // 解析 drawing rels
-  const drawingName = drawingPath.split('/').pop();
-  const drawingRelsPath = drawingPath.replace('drawings/', 'drawings/_rels/') + '.rels';
-  if(!zip.files[drawingRelsPath]) return {};
-
-  const drawingRelsXml = await zip.files[drawingRelsPath].async('text');
-  const drawingRelsDoc = new DOMParser().parseFromString(drawingRelsXml, 'text/xml');
-  const rIdToMedia = {};
-  drawingRelsDoc.querySelectorAll('Relationship').forEach(r=>{
-    rIdToMedia[r.getAttribute('Id')] = r.getAttribute('Target');
-  });
-
-  const R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
-  const anchors = [...drawingDoc.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing','twoCellAnchor'),
-                   ...drawingDoc.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing','oneCellAnchor')];
-
-  for(const anchor of anchors){
-    const fromRowEl = anchor.querySelector ? anchor.querySelector('from > row')
-      : anchor.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing','row')[0];
-    if(!fromRowEl) continue;
-    const rowIdx = parseInt(fromRowEl.textContent); // 0-based Excel 列號
-
-    // 找 blip 的 r:embed
-    let rId = null;
-    const blips = anchor.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main','blip');
-    if(blips.length > 0){
-      rId = blips[0].getAttributeNS(R_NS,'embed') || blips[0].getAttribute('r:embed');
-    }
-    if(!rId || !rIdToMedia[rId]) continue;
-
-    const mediaRelTarget = rIdToMedia[rId];
-    const mediaPath = mediaRelTarget.startsWith('../')
-      ? 'xl/' + mediaRelTarget.slice(3)
-      : 'xl/drawings/' + mediaRelTarget;
-
-    if(!zip.files[mediaPath]) continue;
-
-    const imgB64 = await zip.files[mediaPath].async('base64');
-    const ext = mediaPath.split('.').pop().toLowerCase();
-    const mime = {png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', webp:'image/webp'}[ext] || 'image/png';
-    result[rowIdx] = `data:${mime};base64,${imgB64}`;
+  for(const [path, file] of Object.entries(zip.files)){
+    if(!path.startsWith('xl/media/') || file.dir) continue;
+    const ext = path.split('.').pop().toLowerCase();
+    if(!VALID_EXT.includes(ext)) continue;
+    const b64 = await file.async('base64');
+    const name = path.split('/').pop();
+    images.push({ name, dataUrl:`data:${MIME[ext]||'image/jpeg'};base64,${b64}`, matchedRow: findMatchRow(name) });
   }
-
-  return result;
+  return images;
 }
 
-function getImageForRow(rowIndexInSheet){
-  // Excel 列號0-based，直接查map
-  return imageMap[rowIndexInSheet] || null;
+async function downloadImagesAsZip(images){
+  const zip = new JSZip();
+  images.forEach(img=>{
+    const b64 = img.dataUrl.split(',')[1];
+    zip.file(img.name, b64, {base64:true});
+  });
+  const blob = await zip.generateAsync({type:'blob'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = '素材圖片包.zip'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 5000);
 }
 // ────────────────────────────────────────────────────────────
 
@@ -656,13 +598,8 @@ function renderTable(){
     return String(av||'').localeCompare(String(bv||''))*sortDir;
   });
   document.getElementById('tableBody').innerHTML = rows.length ? rows.map(d=>{
-    const thumb = d._excelRow != null ? getImageForRow(d._excelRow) : null;
-    const thumbHtml = thumb
-      ? `<img src="${thumb}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;display:block;">`
-      : `<div style="width:48px;height:48px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text-muted);">—</div>`;
     return `
     <tr>
-      <td>${thumbHtml}</td>
       <td>${d.渠道||'-'}</td>
       <td>${d.格式||'-'}</td>
       <td><span class="tag ${tagClass(d.素材切角)}">${d.素材切角||'-'}</span></td>
@@ -673,10 +610,15 @@ function renderTable(){
       <td>${fmtInt(d.曝光)}</td>
       <td>${d.CPM!=null?'$'+Math.round(d.CPM):'-'}</td>
     </tr>
-  `}).join('') : `<tr><td colspan="10" class="empty">沒有符合條件的素材</td></tr>`;
+  `}).join('') : `<tr><td colspan="9" class="empty">沒有符合條件的素材</td></tr>`;
 }
 
-document.getElementById('contextSelect').addEventListener('change', renderAll);
+document.getElementById('downloadImgZipBtn').addEventListener('click', ()=>{
+  if(!uploadedImages.length){ alert('尚未擷取到任何圖片'); return; }
+  downloadImagesAsZip(uploadedImages);
+});
+
+
 document.getElementById('filterChannel').addEventListener('change', renderTable);
 document.getElementById('filterAngle').addEventListener('change', renderTable);
 document.getElementById('searchBox').addEventListener('input', renderTable);

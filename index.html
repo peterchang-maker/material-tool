@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>天堂M 素材成效分析工具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f3ef; --surface:#ffffff; --border:#e3e0d8; --border-strong:#cfcabb;
+    --text:#23211d; --text-secondary:#6f6a5e; --text-muted:#a39d8c;
+    --teal:#0f6e56; --teal-bg:#e1f5ee; --coral:#993c1d; --coral-bg:#faece7;
+    --amber:#854f0b; --amber-bg:#faeeda; --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:32px 24px 60px; background:var(--bg); color:var(--text);
+    font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+    font-size:14px; line-height:1.6;
+  }
+  .wrap{max-width:1080px; margin:0 auto;}
+  h1{font-size:20px; font-weight:600; margin:0;}
+  .sub{color:var(--text-secondary); font-size:13px; margin:4px 0 24px;}
+
+  .uploadBox{
+    background:var(--surface); border:1.5px dashed var(--border-strong); border-radius:12px;
+    padding:28px; text-align:center; margin-bottom:24px; cursor:pointer; transition:border-color .15s;
+  }
+  .uploadBox:hover{border-color:var(--teal);}
+  .uploadBox.drag{border-color:var(--teal); background:var(--teal-bg);}
+  .uploadBox p{margin:0;}
+  .uploadBox .main{font-size:14px; font-weight:500;}
+  .uploadBox .hint{font-size:12px; color:var(--text-muted); margin-top:4px;}
+  #fileInput{display:none;}
+  .fileBar{display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:13px; color:var(--text-secondary); margin-bottom:20px;}
+  .fileBar button{
+    height:30px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface);
+    padding:0 12px; font-size:12.5px; cursor:pointer; color:var(--text);
+  }
+  .fileBar button:hover{background:#faf9f6;}
+
+  .sheetRow{display:flex; align-items:center; gap:10px; margin-bottom:18px; font-size:13px;}
+  .sheetRow select{height:32px; border:1px solid var(--border-strong); border-radius:8px; padding:0 10px; font-family:inherit;}
+
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:28px;}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px;}
+  .card .label{font-size:12px; color:var(--text-secondary); margin:0 0 6px;}
+  .card .value{font-size:22px; font-weight:600; margin:0;}
+  section{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px 22px; margin-bottom:20px;}
+  section h2{font-size:15px; font-weight:600; margin:0 0 14px;}
+  .chart-row{display:grid; grid-template-columns:1fr 1fr; gap:20px;}
+  canvas{max-height:260px;}
+  .controls{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+  select,input{
+    height:32px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface);
+    padding:0 10px; font-size:13px; color:var(--text); font-family:inherit;
+  }
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th,td{padding:7px 8px; text-align:left; border-bottom:1px solid var(--border); white-space:nowrap;}
+  th{color:var(--text-secondary); font-weight:500; cursor:pointer; user-select:none; position:sticky; top:0; background:var(--surface);}
+  th:hover{color:var(--text);}
+  tbody tr:hover{background:#faf9f6;}
+  .tag{display:inline-block; padding:2px 8px; border-radius:6px; font-size:11.5px;}
+  .tag-teal{background:var(--teal-bg); color:var(--teal);}
+  .tag-coral{background:var(--coral-bg); color:var(--coral);}
+  .tag-amber{background:var(--amber-bg); color:var(--amber);}
+  .table-scroll{max-height:420px; overflow:auto; border:1px solid var(--border); border-radius:8px;}
+  .insight{border-left:3px solid var(--teal); background:var(--teal-bg); border-radius:0 8px 8px 0; padding:12px 16px; margin-top:6px; font-size:13px;}
+  .insight.bad{border-left-color:var(--coral); background:var(--coral-bg);}
+  .empty{color:var(--text-muted); font-size:13px; padding:20px 0; text-align:center;}
+  .errBox{background:var(--coral-bg); color:var(--coral); border-radius:8px; padding:12px 16px; font-size:13px; margin-bottom:18px;}
+  #dashboard{display:none;}
+  @media(max-width:720px){.chart-row{grid-template-columns:1fr;}}
+
+  .imgUpload{
+    background:var(--surface); border:1.5px dashed var(--border-strong); border-radius:12px;
+    padding:20px; text-align:center; cursor:pointer; margin-bottom:16px;
+  }
+  .imgUpload:hover{border-color:var(--teal);}
+  .imgUpload.drag{border-color:var(--teal); background:var(--teal-bg);}
+  #imgInput{display:none;}
+  .imgGrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:10px; margin-bottom:16px;}
+  .imgItem{position:relative; border:1px solid var(--border); border-radius:8px; overflow:hidden; aspect-ratio:1; background:#f0efe9;}
+  .imgItem img{width:100%; height:100%; object-fit:cover; display:block;}
+  .imgItem .matchTag{position:absolute; bottom:0; left:0; right:0; background:rgba(35,33,29,.72); color:#fff; font-size:10px; padding:3px 5px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .imgItem .noMatch{background:rgba(153,60,29,.85);}
+  .primaryBtn{
+    height:36px; border:1px solid var(--teal); border-radius:8px; background:var(--teal); color:#fff;
+    padding:0 16px; font-size:13px; cursor:pointer; font-family:inherit;
+  }
+  .primaryBtn:disabled{opacity:.5; cursor:not-allowed;}
+  .primaryBtn:hover:not(:disabled){background:#0c5b46;}
+  .featTag{display:inline-block; padding:2px 7px; border-radius:6px; font-size:11px; margin:0 4px 4px 0; background:var(--bg); color:var(--text-secondary); border:1px solid var(--border);}
+  .progressText{font-size:12.5px; color:var(--text-secondary); margin-top:10px;}
+  .aiSummary{border-left:3px solid var(--teal); background:var(--teal-bg); border-radius:0 8px 8px 0; padding:14px 18px; font-size:13.5px; white-space:pre-wrap;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>天堂M 素材成效分析工具</h1>
+  <p class="sub">上傳「素材分析」格式的 Excel，自動拆解素材特徵並產出成效洞察</p>
+
+  <div class="uploadBox" id="uploadBox">
+    <p class="main">點擊或拖曳 Excel 檔案到這裡（.xlsx）</p>
+    <p class="hint">需包含欄位：各渠道名稱／素材名稱／費用／預約次數／CPA／點擊／CTR／曝光／CPM</p>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+  </div>
+
+  <div class="fileBar" id="fileBar" style="display:none;">
+    <span id="fileName"></span>
+    <button id="resetBtn">重新上傳</button>
+  </div>
+
+  <div class="sheetRow" id="sheetRow" style="display:none;">
+    <label>選擇分頁：</label>
+    <select id="sheetSelect"></select>
+  </div>
+
+  <div id="errArea"></div>
+
+  <div id="dashboard">
+    <div class="cards" id="summaryCards"></div>
+
+    <div class="sheetRow" style="margin-bottom:8px;">
+      <label>渠道情境：</label>
+      <select id="contextSelect">
+        <option value="導流">導流情境（成效型渠道，目標是預約/轉換）</option>
+        <option value="曝光">曝光情境（曝光型渠道，目標是觸及/廣度）</option>
+        <option value="全部">全部渠道合併</option>
+      </select>
+    </div>
+    <p class="sub" id="contextHint" style="margin:-4px 0 18px;"></p>
+
+    <section>
+      <h2>依素材切角彙總成效</h2>
+      <div class="chart-row">
+        <div><canvas id="angleChart"></canvas></div>
+        <div><canvas id="angleCpaChart"></canvas></div>
+      </div>
+      <div id="angleInsights" style="margin-top:16px;"></div>
+    </section>
+
+    <section>
+      <h2>依賣點彙總 CTR</h2>
+      <canvas id="sellingPointChart" style="max-height:340px;"></canvas>
+    </section>
+
+    <section>
+      <h2>素材明細</h2>
+      <div class="controls">
+        <select id="filterChannel"></select>
+        <select id="filterAngle"></select>
+        <input id="searchBox" placeholder="搜尋素材名稱或賣點">
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th data-key="渠道">渠道</th>
+              <th data-key="格式">格式</th>
+              <th data-key="素材切角">切角</th>
+              <th data-key="賣點">賣點</th>
+              <th data-key="費用">費用</th>
+              <th data-key="點擊">點擊</th>
+              <th data-key="CTR">CTR</th>
+              <th data-key="曝光">曝光</th>
+              <th data-key="CPM">CPM</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>AI 視覺特徵分析（透過 Gemini）</h2>
+      <p class="sub" style="margin:0 0 14px;">這個工具不直接呼叫 AI API，而是幫你產生 Prompt，你貼到 Gemini 視窗、上傳圖片取得結果後，再把結果貼回這裡合併進圖表與洞察。標籤涵蓋色調、人物類型（含AI生成判斷）、人物大小占比、動作姿態、表情、構圖密度、倒數/數字標示、CTA明確度、文字資訊量等九個維度。檔名建議包含賣點關鍵字（如「coupon倒數沙漏」）以利自動配對。</p>
+
+      <div class="imgUpload" id="imgUpload">
+        <p class="main" style="font-size:13px;">點擊或拖曳素材圖片到這裡（僅用於配對預覽，不會上傳到任何伺服器）</p>
+        <input type="file" id="imgInput" accept="image/*" multiple>
+      </div>
+
+      <div class="imgGrid" id="imgGrid"></div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <button class="primaryBtn" id="genPromptBtn" disabled>步驟1：產生分析 Prompt</button>
+        <span class="progressText" id="genPromptHint"></span>
+      </div>
+
+      <div id="promptWrap" style="display:none; margin-top:14px;">
+        <p style="font-size:12.5px; color:var(--text-secondary); margin:0 0 6px;">複製以下 Prompt，貼到 Gemini 對話視窗，並把上面這些圖片一起上傳給它：</p>
+        <textarea id="promptOutput" readonly style="width:100%; height:160px; font-family:var(--font-mono,monospace); font-size:12px; border:1px solid var(--border-strong); border-radius:8px; padding:10px; resize:vertical;"></textarea>
+        <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap; align-items:center;">
+          <button class="primaryBtn" id="copyPromptBtn">複製 Prompt</button>
+          <button class="primaryBtn" id="openGeminiBtn" style="background:var(--surface); color:var(--teal); border-color:var(--teal);">
+            在 Gemini 開啟 ↗
+          </button>
+          <span style="font-size:12px; color:var(--text-muted);" id="openGeminiHint"></span>
+        </div>
+      </div>
+
+      <div style="margin-top:22px; border-top:1px solid var(--border); padding-top:18px;">
+        <p style="font-size:13px; font-weight:500; margin:0 0 8px;">步驟2：把 Gemini 回傳的 JSON 貼在這裡</p>
+        <textarea id="geminiResultInput" placeholder="把 Gemini 回傳的整段 JSON 貼在這裡" style="width:100%; height:140px; font-family:var(--font-mono,monospace); font-size:12px; border:1px solid var(--border-strong); border-radius:8px; padding:10px; resize:vertical;"></textarea>
+        <button class="primaryBtn" id="applyResultBtn" style="margin-top:8px;">套用分析結果</button>
+        <div class="progressText" id="applyHint"></div>
+      </div>
+
+      <div id="aiTableWrap" style="margin-top:18px;"></div>
+
+      <div id="summaryPromptWrap" style="display:none; margin-top:22px; border-top:1px solid var(--border); padding-top:18px;">
+        <p style="font-size:13px; font-weight:500; margin:0 0 8px;">步驟3：產生洞察摘要 Prompt（特徵已與成效數據合併）</p>
+        <button class="primaryBtn" id="genSummaryPromptBtn">產生洞察摘要 Prompt</button>
+        <textarea id="summaryPromptOutput" readonly style="display:none; width:100%; height:140px; margin-top:10px; font-family:var(--font-mono,monospace); font-size:12px; border:1px solid var(--border-strong); border-radius:8px; padding:10px; resize:vertical;"></textarea>
+        <div id="summaryPromptBtns" style="display:none; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;">
+          <button class="primaryBtn" id="copySummaryPromptBtn">複製 Prompt</button>
+          <button class="primaryBtn" id="openGeminiSummaryBtn" style="background:var(--surface); color:var(--teal); border-color:var(--teal);">在 Gemini 開啟 ↗</button>
+          <span style="font-size:12px; color:var(--text-muted);" id="openGeminiSummaryHint"></span>
+        </div>
+
+        <p style="font-size:13px; font-weight:500; margin:18px 0 8px;">把 Gemini 回傳的洞察文字貼在這裡</p>
+        <textarea id="summaryResultInput" placeholder="把 Gemini 回傳的洞察摘要文字貼在這裡" style="width:100%; height:120px; font-family:inherit; font-size:13px; border:1px solid var(--border-strong); border-radius:8px; padding:10px; resize:vertical;"></textarea>
+        <button class="primaryBtn" id="applySummaryBtn" style="margin-top:8px;">顯示洞察摘要</button>
+      </div>
+      <div id="aiSummaryWrap" style="margin-top:16px;"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+let angleChartInst=null, angleCpaChartInst=null, spChartInst=null;
+let sortKey='點擊', sortDir=-1;
+const uploadBox = document.getElementById('uploadBox');
+const fileInput = document.getElementById('fileInput');
+const fileBar = document.getElementById('fileBar');
+const fileName = document.getElementById('fileName');
+const sheetRow = document.getElementById('sheetRow');
+const sheetSelect = document.getElementById('sheetSelect');
+const errArea = document.getElementById('errArea');
+const dashboard = document.getElementById('dashboard');
+
+uploadBox.addEventListener('click', ()=>fileInput.click());
+uploadBox.addEventListener('dragover', e=>{ e.preventDefault(); uploadBox.classList.add('drag'); });
+uploadBox.addEventListener('dragleave', ()=> uploadBox.classList.remove('drag'));
+uploadBox.addEventListener('drop', e=>{
+  e.preventDefault(); uploadBox.classList.remove('drag');
+  if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e=>{
+  if(e.target.files.length) handleFile(e.target.files[0]);
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  workbook=null; RAW=[];
+  uploadedImages=[]; aiResults={};
+  uploadBox.style.display='block';
+  fileBar.style.display='none';
+  sheetRow.style.display='none';
+  dashboard.style.display='none';
+  errArea.innerHTML='';
+  fileInput.value='';
+  imgGrid.innerHTML='';
+  document.getElementById('promptWrap').style.display='none';
+  document.getElementById('aiTableWrap').innerHTML='';
+  document.getElementById('aiSummaryWrap').innerHTML='';
+  document.getElementById('summaryPromptWrap').style.display='none';
+  document.getElementById('geminiResultInput').value='';
+  document.getElementById('summaryResultInput').value='';
+  genPromptBtn.disabled=true;
+});
+
+function handleFile(file){
+  errArea.innerHTML='';
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      workbook = XLSX.read(e.target.result, {type:'array'});
+    }catch(err){
+      errArea.innerHTML = `<div class="errBox">無法讀取檔案，請確認是有效的 Excel 檔案。</div>`;
+      return;
+    }
+    fileName.textContent = file.name;
+    uploadBox.style.display='none';
+    fileBar.style.display='flex';
+
+    const candidates = workbook.SheetNames.filter(n=>n.includes('素材分析') || n.includes('成效'));
+    const sheetNames = candidates.length ? candidates.concat(workbook.SheetNames.filter(n=>!candidates.includes(n))) : workbook.SheetNames;
+    sheetSelect.innerHTML = sheetNames.map(n=>`<option>${n}</option>`).join('');
+    sheetRow.style.display='flex';
+    parseSheet(sheetSelect.value);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+sheetSelect.addEventListener('change', ()=>parseSheet(sheetSelect.value));
+
+function cleanMoney(x){
+  if(x==null) return null;
+  if(typeof x==='number') return x;
+  const s = String(x).replace(/[$＄,]/g,'').trim();
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+
+function parseMaterialName(raw){
+  const name = String(raw).split('\n')[0];
+  const parts = name.split('_');
+  return {
+    格式: parts[0] || null,
+    視覺類型: parts[1] || null,
+    素材切角: parts[2] ? parts[2].trim() : null,
+    賣點: parts[3] ? parts[3].trim() : null,
+    素材名稱: name
+  };
+}
+
+function parseSheet(sheetName){
+  errArea.innerHTML='';
+  const ws = workbook.Sheets[sheetName];
+  if(!ws){ errArea.innerHTML = `<div class="errBox">找不到分頁「${sheetName}」。</div>`; return; }
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+
+  // 找出標頭列（含「素材名稱」欄位的那一列）
+  let headerIdx = -1;
+  for(let i=0;i<Math.min(rows.length,20);i++){
+    if(rows[i] && rows[i].some(c=>String(c||'').includes('素材名稱'))){
+      headerIdx = i; break;
+    }
+  }
+  if(headerIdx===-1){
+    errArea.innerHTML = `<div class="errBox">這個分頁找不到「素材名稱」欄位，請確認格式或改選其他分頁。</div>`;
+    dashboard.style.display='none';
+    return;
+  }
+
+  const header = rows[headerIdx].map(h=>String(h||'').trim());
+  const colIdx = key => header.findIndex(h=>h.includes(key));
+  const idx = {
+    channel: colIdx('渠道名稱'),
+    name: colIdx('素材名稱'),
+    cost: colIdx('費用'),
+    conv: colIdx('預約次數'),
+    cpa: header.findIndex(h=>h==='CPA'),
+    click: colIdx('點擊'),
+    ctr: header.findIndex(h=>h.toUpperCase()==='CTR'),
+    impr: colIdx('曝光'),
+    cpm: header.findIndex(h=>h.toUpperCase()==='CPM'),
+  };
+  if(idx.name===-1 || idx.click===-1 || idx.impr===-1){
+    errArea.innerHTML = `<div class="errBox">欄位不完整，至少需要「素材名稱」「點擊」「曝光」。</div>`;
+    dashboard.style.display='none';
+    return;
+  }
+
+  let currentChannel = null;
+  const out = [];
+  for(let i=headerIdx+1; i<rows.length; i++){
+    const r = rows[i];
+    if(!r) continue;
+    const ch = idx.channel>=0 ? r[idx.channel] : null;
+    if(ch) currentChannel = ch;
+    const nameVal = r[idx.name];
+    if(!nameVal) continue;
+    if(String(nameVal).includes('導入表現') || String(nameVal).includes('說明')) break;
+    const click = r[idx.click];
+    const impr = r[idx.impr];
+    if(typeof click !== 'number' || typeof impr !== 'number') continue;
+
+    const parsed = parseMaterialName(nameVal);
+    out.push({
+      渠道: currentChannel,
+      ...parsed,
+      費用: cleanMoney(idx.cost>=0 ? r[idx.cost] : null),
+      預約次數: idx.conv>=0 ? r[idx.conv] : null,
+      CPA: cleanMoney(idx.cpa>=0 ? r[idx.cpa] : null),
+      點擊: click,
+      CTR: idx.ctr>=0 ? r[idx.ctr] : (click && impr ? click/impr : null),
+      曝光: impr,
+      CPM: idx.cpm>=0 ? cleanMoney(r[idx.cpm]) : null,
+    });
+  }
+
+  if(!out.length){
+    errArea.innerHTML = `<div class="errBox">沒有解析到任何素材列，請確認資料格式或改選其他分頁。</div>`;
+    dashboard.style.display='none';
+    return;
+  }
+
+  RAW = out;
+  dashboard.style.display='block';
+  renderAll();
+}
+
+function fmtPct(x){ return x==null ? '-' : (x*100).toFixed(2) + '%'; }
+function fmtInt(x){ return x==null ? '-' : Math.round(x).toLocaleString(); }
+function fmtMoney(x){ return x==null ? '-' : '$' + Math.round(x).toLocaleString(); }
+
+function aggBy(field, rows){
+  const g = {};
+  rows.forEach(d=>{
+    const key = d[field] || '未分類';
+    g[key] = g[key] || {click:0, impr:0, cost:0, conv:0};
+    g[key].click += d.點擊 || 0;
+    g[key].impr += d.曝光 || 0;
+    g[key].cost += d.費用 || 0;
+    g[key].conv += (typeof d.預約次數 === 'number' ? d.預約次數 : 0);
+  });
+  return Object.entries(g).map(([k,v])=>({
+    key:k, ctr: v.impr ? v.click/v.impr : 0, cpa: v.conv ? v.cost/v.conv : null, click:v.click, impr:v.impr
+  }));
+}
+
+function tagClass(angle){
+  if(!angle) return 'tag-coral';
+  if(angle.includes('獎勵')) return 'tag-teal';
+  if(angle.includes('改版')) return 'tag-amber';
+  return 'tag-coral';
+}
+
+function getContextChannels(){
+  const ctx = document.getElementById('contextSelect') ? document.getElementById('contextSelect').value : '導流';
+  const allChannels = [...new Set(RAW.map(d=>d.渠道).filter(Boolean))];
+  if(ctx === '導流') return allChannels.filter(c=>c.includes('成效型'));
+  if(ctx === '曝光') return allChannels.filter(c=>c.includes('曝光型'));
+  return allChannels;
+}
+
+function renderAll(){
+  const channelSet = getContextChannels();
+  const perfData = channelSet.length ? RAW.filter(d=>channelSet.includes(d.渠道)) : RAW;
+
+  const ctxLabel = {'導流':'導流情境（成效型渠道）','曝光':'曝光情境（曝光型渠道）','全部':'全部渠道合併'}[document.getElementById('contextSelect').value];
+  document.getElementById('contextHint').textContent = channelSet.length
+    ? `目前彙總範圍：${ctxLabel}，共 ${channelSet.length} 個渠道（${channelSet.join('、')}）`
+    : `目前選擇的情境下沒有對應渠道資料，已改用全部渠道。`;
+
+  const totalMaterials = new Set(RAW.map(d=>d.賣點+d.格式)).size;
+  const totalClick = perfData.reduce((s,d)=>s+(d.點擊||0),0);
+  const totalImpr = perfData.reduce((s,d)=>s+(d.曝光||0),0);
+  const totalCost = perfData.reduce((s,d)=>s+(d.費用||0),0);
+  const avgCTR = totalImpr ? totalClick/totalImpr : 0;
+
+  const angleAgg = aggBy('素材切角', perfData).sort((a,b)=>b.ctr-a.ctr);
+  const bestAngleKey = angleAgg.length ? angleAgg[0].key : '-';
+
+  document.getElementById('summaryCards').innerHTML = `
+    <div class="card"><p class="label">素材總數</p><p class="value">${totalMaterials}</p></div>
+    <div class="card"><p class="label">${ctxLabel}平均CTR</p><p class="value">${fmtPct(avgCTR)}</p></div>
+    <div class="card"><p class="label">${ctxLabel}總花費</p><p class="value">${fmtMoney(totalCost)}</p></div>
+    <div class="card"><p class="label">表現最佳切角</p><p class="value">${bestAngleKey}</p></div>
+  `;
+
+  if(angleChartInst) angleChartInst.destroy();
+  angleChartInst = new Chart(document.getElementById('angleChart'), {
+    type:'bar',
+    data:{ labels: angleAgg.map(d=>d.key), datasets:[{label:'CTR', data: angleAgg.map(d=>+(d.ctr*100).toFixed(2)), backgroundColor:'#1d9e75'}] },
+    options:{ plugins:{title:{display:true,text:'CTR（%）依素材切角',font:{size:12}}, legend:{display:false}}, scales:{y:{ticks:{callback:v=>v+'%'}}} }
+  });
+
+  if(angleCpaChartInst) angleCpaChartInst.destroy();
+  angleCpaChartInst = new Chart(document.getElementById('angleCpaChart'), {
+    type:'bar',
+    data:{ labels: angleAgg.map(d=>d.key), datasets:[{label:'平均CPA', data: angleAgg.map(d=>d.cpa?+d.cpa.toFixed(1):0), backgroundColor:'#d85a30'}] },
+    options:{ plugins:{title:{display:true,text:'平均 CPA（元）依素材切角',font:{size:12}}, legend:{display:false}} }
+  });
+
+  const insightsEl = document.getElementById('angleInsights');
+  if(angleAgg.length>=2){
+    const best = angleAgg[0], worst = angleAgg[angleAgg.length-1];
+    insightsEl.innerHTML = `
+      <div class="insight"><b>${best.key}</b> 點擊效率最高，CTR 達 ${fmtPct(best.ctr)}，建議優先擴大此切角的素材產出與預算配置。</div>
+      <div class="insight bad"><b>${worst.key}</b> CTR 偏低（${fmtPct(worst.ctr)}），建議結合具體福利或行動誘因再優化。</div>
+    `;
+  } else {
+    insightsEl.innerHTML = '';
+  }
+
+  const spAgg = aggBy('賣點', perfData).sort((a,b)=>b.ctr-a.ctr);
+  if(spChartInst) spChartInst.destroy();
+  spChartInst = new Chart(document.getElementById('sellingPointChart'), {
+    type:'bar',
+    data:{
+      labels: spAgg.map(d=>d.key),
+      datasets:[{label:'CTR', data: spAgg.map(d=>+(d.ctr*100).toFixed(2)),
+        backgroundColor: spAgg.map(d=> d.ctr>=avgCTR ? '#1d9e75' : '#f0997b')}]
+    },
+    options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{callback:v=>v+'%'}}} }
+  });
+
+  const channelSel = document.getElementById('filterChannel');
+  const angleSel = document.getElementById('filterAngle');
+  const uniq = arr => [...new Set(arr.filter(Boolean))];
+  channelSel.innerHTML = '<option value="">所有渠道</option>' + uniq(RAW.map(d=>d.渠道)).map(c=>`<option>${c}</option>`).join('');
+  angleSel.innerHTML = '<option value="">所有切角</option>' + uniq(RAW.map(d=>d.素材切角)).map(c=>`<option>${c}</option>`).join('');
+
+  renderTable();
+}
+
+function renderTable(){
+  const channelSel = document.getElementById('filterChannel');
+  const angleSel = document.getElementById('filterAngle');
+  const searchBox = document.getElementById('searchBox');
+
+  let rows = RAW.filter(d=>{
+    if(channelSel.value && d.渠道!==channelSel.value) return false;
+    if(angleSel.value && d.素材切角!==angleSel.value) return false;
+    const q = searchBox.value.trim();
+    if(q && !((d.素材名稱||'').includes(q) || (d.賣點||'').includes(q))) return false;
+    return true;
+  });
+  rows.sort((a,b)=>{
+    const av=a[sortKey], bv=b[sortKey];
+    if(typeof av==='number' && typeof bv==='number') return (av-bv)*sortDir;
+    return String(av||'').localeCompare(String(bv||''))*sortDir;
+  });
+  document.getElementById('tableBody').innerHTML = rows.length ? rows.map(d=>`
+    <tr>
+      <td>${d.渠道||'-'}</td>
+      <td>${d.格式||'-'}</td>
+      <td><span class="tag ${tagClass(d.素材切角)}">${d.素材切角||'-'}</span></td>
+      <td>${d.賣點||'-'}</td>
+      <td>${fmtMoney(d.費用)}</td>
+      <td>${fmtInt(d.點擊)}</td>
+      <td>${fmtPct(d.CTR)}</td>
+      <td>${fmtInt(d.曝光)}</td>
+      <td>${d.CPM!=null?'$'+Math.round(d.CPM):'-'}</td>
+    </tr>
+  `).join('') : `<tr><td colspan="9" class="empty">沒有符合條件的素材</td></tr>`;
+}
+
+document.getElementById('contextSelect').addEventListener('change', renderAll);
+document.getElementById('filterChannel').addEventListener('change', renderTable);
+document.getElementById('filterAngle').addEventListener('change', renderTable);
+document.getElementById('searchBox').addEventListener('input', renderTable);
+document.querySelectorAll('th[data-key]').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const key = th.dataset.key;
+    sortDir = (sortKey===key) ? -sortDir : -1;
+    sortKey = key;
+    renderTable();
+  });
+});
+
+let uploadedImages = []; // {name, dataUrl}
+let aiResults = {}; // key: image name -> tags
+
+const imgUpload = document.getElementById('imgUpload');
+const imgInput = document.getElementById('imgInput');
+const imgGrid = document.getElementById('imgGrid');
+const genPromptBtn = document.getElementById('genPromptBtn');
+const genPromptHint = document.getElementById('genPromptHint');
+
+imgUpload.addEventListener('click', ()=>imgInput.click());
+imgUpload.addEventListener('dragover', e=>{ e.preventDefault(); imgUpload.classList.add('drag'); });
+imgUpload.addEventListener('dragleave', ()=> imgUpload.classList.remove('drag'));
+imgUpload.addEventListener('drop', e=>{
+  e.preventDefault(); imgUpload.classList.remove('drag');
+  handleImages([...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')));
+});
+imgInput.addEventListener('change', e=> handleImages([...e.target.files]));
+
+function findMatchRow(filename){
+  const cleanName = filename.replace(/\.[^.]+$/,'');
+  // 1. 精確比對：賣點完全等於檔名去副檔名的某段
+  const parts = cleanName.split('_');
+  let exact = RAW.find(d => d.賣點 && parts.includes(d.賣點.trim()));
+  if(exact) return exact;
+  // 2. 排序由長到短比對，避免短賣點誤配長檔名
+  const sorted = [...RAW].filter(d=>d.賣點).sort((a,b)=>b.賣點.length - a.賣點.length);
+  return sorted.find(d => cleanName.includes(d.賣點.trim())) || null;
+}
+
+function handleImages(files){
+  files.forEach(file=>{
+    const reader = new FileReader();
+    reader.onload = e=>{
+      const dataUrl = e.target.result;
+      const matchedRow = findMatchRow(file.name);
+      uploadedImages.push({name:file.name, dataUrl, matchedRow});
+      renderImgGrid();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderImgGrid(){
+  imgGrid.innerHTML = uploadedImages.map((img,i)=>`
+    <div class="imgItem">
+      <img src="${img.dataUrl}" alt="${img.name}">
+      <div class="matchTag ${img.matchedRow?'':'noMatch'}">${img.matchedRow ? img.matchedRow.賣點 : '未配對成效'}</div>
+    </div>
+  `).join('');
+  genPromptBtn.disabled = uploadedImages.length===0;
+}
+
+function parseJsonSafe(text){
+  let clean = text
+    .replace(/^\uFEFF/, '')           // 移除 BOM
+    .replace(/```json\s*/g, '')       // 移除 markdown 標記
+    .replace(/```\s*/g, '')
+    .trim();
+  // 擷取第一個 [ ... ] 或 { ... } 區段
+  const arrMatch = clean.match(/(\[[\s\S]*\])/);
+  const objMatch = clean.match(/(\{[\s\S]*\})/);
+  const target = arrMatch ? arrMatch[1] : (objMatch ? objMatch[1] : clean);
+  try{ return JSON.parse(target); }catch(e){ return null; }
+}
+
+const TAG_SCHEMA = `{
+  "檔名":"完整檔名（須與我提供的檔名清單完全一致）",
+  "色調":"暗色調或亮色調或中性",
+  "人物類型":"無人物或真人實拍或AI生成人物或遊戲手繪立繪或3D建模",
+  "人物大小占比":"無人物或臉部特寫(占畫面50%以上)或半身(占畫面25-50%)或全身(占畫面10-25%)或縮小背景(占畫面10%以下)",
+  "人物動作姿態":"無人物或靜態站立或戰鬥攻擊動作或奔跑跳躍或坐姿或互動手勢(如比讚指向)或無法判斷",
+  "表情情緒":"無人物或微笑親和或嚴肅冷峻或驚訝興奮或中性無表情或無法判斷",
+  "構圖密度":"高留白(畫面簡潔)或低留白(畫面密集)",
+  "是否有數字或倒數":"有或無，若有請說明是倒數計時/折扣數字/時長標示等何種類型",
+  "CTA明確度":"明確(有清楚行動呼籲文字)或模糊或無",
+  "文字資訊量":"高(大量文字說明)或中或低(幾乎無文字)"
+}`;
+
+genPromptBtn.addEventListener('click', ()=>{
+  const fileList = uploadedImages.map(img=>`- ${img.name}`).join('\n');
+  const prompt = `你是遊戲行銷素材分析師。我會上傳數張遊戲行銷素材圖片，檔名如下：
+${fileList}
+
+請針對「每一張」圖片輸出結構化的視覺特徵標籤，欄位格式如下（檔名必須跟我提供的清單完全一致，用來對應）：
+${TAG_SCHEMA}
+
+補充判斷依據：
+- 「人物類型」要判斷是真人實拍照片/影片截圖、AI生成人像（觀察手指數量、皮膚紋理是否過於平滑、背景是否有變形扭曲等AI生成痕跡）、遊戲手繪立繪、還是3D建模角色，如果無法確定請選最接近的選項並可在後面加註「(不確定)」。
+- 「人物大小占比」請目測該人物在整張畫面中的面積比例。
+- 同一張圖若有多個人物，請以畫面中最主要/最大的人物為準。
+
+請回傳一個JSON陣列，包含每張圖片各一筆物件，不要任何其他文字、不要markdown標記、不要解釋，只回傳純JSON陣列。`;
+  document.getElementById('promptOutput').value = prompt;
+  document.getElementById('promptWrap').style.display = 'block';
+  genPromptHint.textContent = `已產生 ${uploadedImages.length} 張圖片的分析 Prompt`;
+});
+
+document.getElementById('copyPromptBtn').addEventListener('click', ()=>{
+  const ta = document.getElementById('promptOutput');
+  ta.select();
+  navigator.clipboard.writeText(ta.value).then(()=>{
+    document.getElementById('copyPromptBtn').textContent = '已複製！';
+    setTimeout(()=>{ document.getElementById('copyPromptBtn').textContent = '複製 Prompt'; }, 1500);
+  });
+});
+
+document.getElementById('openGeminiBtn').addEventListener('click', ()=>{
+  const ta = document.getElementById('promptOutput');
+  const hint = document.getElementById('openGeminiHint');
+  navigator.clipboard.writeText(ta.value).then(()=>{
+    hint.textContent = '✓ Prompt 已自動複製，請在 Gemini 視窗貼上後再上傳圖片';
+    setTimeout(()=>{ hint.textContent = ''; }, 4000);
+    window.open('https://gemini.google.com', '_blank');
+  }).catch(()=>{
+    // clipboard 失敗時仍然開啟，並提示手動複製
+    hint.textContent = '請先手動複製 Prompt，再到 Gemini 視窗貼上';
+    window.open('https://gemini.google.com', '_blank');
+  });
+});
+
+document.getElementById('applyResultBtn').addEventListener('click', ()=>{
+  const raw = document.getElementById('geminiResultInput').value.trim();
+  const applyHint = document.getElementById('applyHint');
+  if(!raw){ applyHint.textContent = '請先貼上 Gemini 回傳的內容'; applyHint.style.color = 'var(--coral)'; return; }
+  const parsed = parseJsonSafe(raw);
+  if(!parsed || !Array.isArray(parsed)){
+    applyHint.textContent = '無法解析成 JSON 陣列，請確認貼上的內容是否完整、是否包含多餘文字';
+    applyHint.style.color = 'var(--coral)';
+    return;
+  }
+  aiResults = {};
+  parsed.forEach(item=>{
+    if(item && item.檔名) aiResults[item.檔名] = item;
+  });
+  const matchedCount = uploadedImages.filter(img=>aiResults[img.name]).length;
+  applyHint.textContent = `已套用，成功對應 ${matchedCount}/${uploadedImages.length} 張圖片`;
+  applyHint.style.color = 'var(--text-secondary)';
+  renderAiTable();
+  document.getElementById('summaryPromptWrap').style.display = 'block';
+});
+
+function renderAiTable(){
+  const wrap = document.getElementById('aiTableWrap');
+  const rows = uploadedImages.map(img=>{
+    const tags = aiResults[img.name];
+    const perf = img.matchedRow;
+    const tagHtml = tags
+      ? Object.entries(tags).filter(([k])=>k!=='檔名').map(([k,v])=>`<span class="featTag">${k}:${v}</span>`).join('')
+      : '<span style="color:var(--text-muted); font-size:12px;">尚未套用分析結果</span>';
+    return `
+      <div style="display:flex; gap:14px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border);">
+        <img src="${img.dataUrl}" style="width:60px; height:60px; object-fit:cover; border-radius:8px; flex-shrink:0;">
+        <div style="flex:1; min-width:0;">
+          <p style="margin:0 0 4px; font-size:12.5px; font-weight:500;">${img.name}</p>
+          ${perf ? `<p style="margin:0 0 6px; font-size:11.5px; color:var(--text-secondary);">配對：${perf.賣點}　CTR ${fmtPct(perf.CTR)}　點擊 ${fmtInt(perf.點擊)}</p>` : `<p style="margin:0 0 6px; font-size:11.5px; color:var(--coral);">未配對到成效資料</p>`}
+          <div>${tagHtml}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  wrap.innerHTML = rows;
+}
+
+document.getElementById('genSummaryPromptBtn').addEventListener('click', ()=>{
+  const records = uploadedImages
+    .filter(img => img.matchedRow && aiResults[img.name])
+    .map(img => ({ 賣點: img.matchedRow.賣點, CTR: img.matchedRow.CTR, 點擊: img.matchedRow.點擊, 特徵: aiResults[img.name] }));
+
+  if(records.length < 2){
+    document.getElementById('aiSummaryWrap').innerHTML = `<div class="errBox">至少需要2筆成功配對成效數據的素材才能產生洞察摘要，目前只有 ${records.length} 筆。</div>`;
+    return;
+  }
+  const prompt = `以下是遊戲行銷素材的視覺特徵與成效數據（CTR為點擊率），請用繁體中文分析哪些視覺特徵跟高CTR或低CTR相關，給出2-4點具體洞察與下次製作素材的建議，不要用JSON，直接輸出條列文字：
+${JSON.stringify(records, null, 2)}`;
+  const out = document.getElementById('summaryPromptOutput');
+  out.value = prompt;
+  out.style.display = 'block';
+  const btnWrap = document.getElementById('summaryPromptBtns');
+  btnWrap.style.display = 'flex';
+});
+
+document.getElementById('copySummaryPromptBtn').addEventListener('click', ()=>{
+  const ta = document.getElementById('summaryPromptOutput');
+  ta.select();
+  navigator.clipboard.writeText(ta.value).then(()=>{
+    document.getElementById('copySummaryPromptBtn').textContent = '已複製！';
+    setTimeout(()=>{ document.getElementById('copySummaryPromptBtn').textContent = '複製 Prompt'; }, 1500);
+  });
+});
+
+document.getElementById('openGeminiSummaryBtn').addEventListener('click', ()=>{
+  const ta = document.getElementById('summaryPromptOutput');
+  const hint = document.getElementById('openGeminiSummaryHint');
+  navigator.clipboard.writeText(ta.value).then(()=>{
+    hint.textContent = '✓ Prompt 已自動複製，請在 Gemini 視窗貼上';
+    setTimeout(()=>{ hint.textContent = ''; }, 4000);
+    window.open('https://gemini.google.com', '_blank');
+  }).catch(()=>{
+    hint.textContent = '請先手動複製 Prompt，再到 Gemini 視窗貼上';
+    window.open('https://gemini.google.com', '_blank');
+  });
+});
+
+document.getElementById('applySummaryBtn').addEventListener('click', ()=>{
+  const text = document.getElementById('summaryResultInput').value.trim();
+  const summaryWrap = document.getElementById('aiSummaryWrap');
+  if(!text){
+    summaryWrap.innerHTML = `<div class="errBox">請先貼上 Gemini 回傳的洞察摘要文字</div>`;
+    return;
+  }
+  summaryWrap.innerHTML = `<div class="aiSummary">${text.replace(/</g,'&lt;')}</div>`;
+});
+</script>
+</body>
+</html>

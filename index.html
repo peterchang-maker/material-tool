@@ -6,6 +6,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{
     --bg:#f4f3ef; --surface:#ffffff; --border:#e3e0d8; --border-strong:#cfcabb;
@@ -94,12 +95,36 @@
   .featTag{display:inline-block; padding:2px 7px; border-radius:6px; font-size:11px; margin:0 4px 4px 0; background:var(--bg); color:var(--text-secondary); border:1px solid var(--border);}
   .progressText{font-size:12.5px; color:var(--text-secondary); margin-top:10px;}
   .aiSummary{border-left:3px solid var(--teal); background:var(--teal-bg); border-radius:0 8px 8px 0; padding:14px 18px; font-size:13.5px; white-space:pre-wrap;}
+
+  /* ── v2 新增樣式 ─────────────────────────── */
+  .warnBadge{display:inline-block; padding:1px 6px; border-radius:5px; font-size:10.5px; background:var(--amber-bg); color:var(--amber); margin-left:5px; vertical-align:1px;}
+  tr.lowSample td{color:var(--text-muted);}
+  .checkPanel{border-radius:10px; padding:12px 16px; font-size:13px; margin-bottom:18px;}
+  .checkPanel.ok{background:var(--teal-bg); color:var(--teal);}
+  .checkPanel.warn{background:var(--amber-bg); color:var(--amber);}
+  .checkPanel ul{margin:8px 0 0; padding-left:18px;}
+  .checkPanel li{font-size:12.5px; margin:2px 0;}
+  .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:0 0 18px;}
+  .toolbar .sep{width:1px; height:22px; background:var(--border-strong);}
+  .toolbar label{font-size:12.5px; color:var(--text-secondary);}
+  .toolbar input[type=number]{width:90px;}
+  .ghostBtn{height:32px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface); padding:0 12px; font-size:12.5px; cursor:pointer; color:var(--text); font-family:inherit;}
+  .ghostBtn:hover{background:#faf9f6;}
+  .hypoCard{border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:10px; font-size:13px;}
+  .hypoCard .verdict{font-weight:600;}
+  .hypoCard .verdict.pass{color:var(--teal);}
+  .hypoCard .verdict.fail{color:var(--coral);}
+  .hypoCard .verdict.na{color:var(--text-muted);}
+  .hypoHist{font-size:11.5px; color:var(--text-muted); margin-top:6px;}
+  .histItem{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); font-size:12.5px;}
+  .histItem .meta{color:var(--text-muted); font-size:11.5px;}
+  .histItem button{height:26px; font-size:11.5px; padding:0 10px;}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>天堂M 素材成效分析工具</h1>
-  <p class="sub">上傳「素材分析」格式的 Excel，自動拆解素材特徵並產出成效洞察</p>
+  <h1>天堂M 素材成效分析工具 <span style="font-size:12px; color:var(--text-muted); font-weight:400;">v2</span></h1>
+  <p class="sub">上傳「素材分析」格式的 Excel，自動拆解素材特徵並產出成效洞察。v2 新增：命名驗證、樣本量警示、走期疲勞分析、單次 AI 往返、假設追蹤、歷史庫備份、週報圖卡匯出。</p>
 
   <div class="uploadBox" id="uploadBox">
     <p class="main">點擊或拖曳 Excel 檔案到這裡（.xlsx）</p>
@@ -118,9 +143,18 @@
   </div>
 
   <div id="errArea"></div>
+  <div id="nameCheckPanel"></div>
 
   <div id="dashboard">
     <div class="cards" id="summaryCards"></div>
+
+    <div class="toolbar">
+      <label>低樣本警示門檻（曝光）：</label>
+      <input type="number" id="imprThresholdInput" min="0" step="500" value="3000">
+      <div class="sep"></div>
+      <button class="ghostBtn" id="saveHistoryBtn">儲存本次分析到歷史庫</button>
+      <button class="ghostBtn" id="exportCardBtn">匯出週報圖卡（PNG）</button>
+    </div>
 
     <div class="sheetRow" style="margin-bottom:8px;">
       <label>渠道情境：</label>
@@ -161,6 +195,7 @@
               <th data-key="格式">格式</th>
               <th data-key="素材切角">切角</th>
               <th data-key="賣點">賣點</th>
+              <th data-key="走期">走期</th>
               <th data-key="費用">費用</th>
               <th data-key="點擊">點擊</th>
               <th data-key="CTR">CTR</th>
@@ -171,6 +206,13 @@
           <tbody id="tableBody"></tbody>
         </table>
       </div>
+    </section>
+
+    <section>
+      <h2>走期疲勞分析</h2>
+      <p class="sub" style="margin:0 0 12px;">同一素材在不同走期的 CTR 變化，用來判斷素材是否已疲勞、該不該換。需要素材命名包含第 5 段「走期」欄位。</p>
+      <div id="cycleWrap"><canvas id="cycleChart" style="max-height:300px;"></canvas></div>
+      <div id="cycleHint"></div>
     </section>
 
     <section>
@@ -190,7 +232,7 @@
       <div class="imgGrid" id="imgGrid"></div>
 
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-        <button class="primaryBtn" id="genPromptBtn" disabled>步驟1：產生分析 Prompt</button>
+        <button class="primaryBtn" id="genPromptBtn" disabled>步驟1：產生分析 Prompt（標籤＋洞察一次完成）</button>
         <span class="progressText" id="genPromptHint"></span>
       </div>
 
@@ -207,8 +249,8 @@
       </div>
 
       <div style="margin-top:22px; border-top:1px solid var(--border); padding-top:18px;">
-        <p style="font-size:13px; font-weight:500; margin:0 0 8px;">步驟2：把 Gemini 回傳的 JSON 貼在這裡</p>
-        <textarea id="geminiResultInput" placeholder="把 Gemini 回傳的整段 JSON 貼在這裡" style="width:100%; height:140px; font-family:var(--font-mono,monospace); font-size:12px; border:1px solid var(--border-strong); border-radius:8px; padding:10px; resize:vertical;"></textarea>
+        <p style="font-size:13px; font-weight:500; margin:0 0 8px;">步驟2：把 Gemini 回傳的結果貼在這裡（標籤與洞察會一次套用）</p>
+        <textarea id="geminiResultInput" placeholder="把 Gemini 回傳的整段內容貼在這裡" style="width:100%; height:140px; font-family:var(--font-mono,monospace); font-size:12px; border:1px solid var(--border-strong); border-radius:8px; padding:10px; resize:vertical;"></textarea>
         <button class="primaryBtn" id="applyResultBtn" style="margin-top:8px;">套用分析結果</button>
         <div class="progressText" id="applyHint"></div>
       </div>
@@ -216,7 +258,7 @@
       <div id="aiTableWrap" style="margin-top:18px;"></div>
 
       <div id="summaryPromptWrap" style="display:none; margin-top:22px; border-top:1px solid var(--border); padding-top:18px;">
-        <p style="font-size:13px; font-weight:500; margin:0 0 8px;">步驟3：產生洞察摘要 Prompt（特徵已與成效數據合併）</p>
+        <p style="font-size:13px; font-weight:500; margin:0 0 8px;">選用：單獨重新產生洞察摘要（若上一步已回傳洞察，可略過）</p>
         <button class="primaryBtn" id="genSummaryPromptBtn">產生洞察摘要 Prompt</button>
         <textarea id="summaryPromptOutput" readonly style="display:none; width:100%; height:140px; margin-top:10px; font-family:var(--font-mono,monospace); font-size:12px; border:1px solid var(--border-strong); border-radius:8px; padding:10px; resize:vertical;"></textarea>
         <div id="summaryPromptBtns" style="display:none; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;">
@@ -231,8 +273,38 @@
       </div>
       <div id="aiSummaryWrap" style="margin-top:16px;"></div>
     </section>
+
+    <section>
+      <h2>假設追蹤（洞察驗證閉環）</h2>
+      <p class="sub" style="margin:0 0 12px;">把行動建議變成可驗證的假設。輸入關鍵字後，工具會在每次上傳新資料時，自動比對「含關鍵字素材 vs 其他素材」的加權 CTR，驗證建議是否兌現。</p>
+      <div class="controls" style="margin-bottom:14px;">
+        <input id="hypoDesc" placeholder="假設描述，例：加倒數標示可提升 CTR" style="flex:1; min-width:220px;">
+        <input id="hypoKeyword" placeholder="比對關鍵字，例：倒數" style="width:160px;">
+        <button class="primaryBtn" id="addHypoBtn" style="height:32px; font-size:12.5px;">新增假設</button>
+      </div>
+      <div id="hypoList"></div>
+    </section>
+
+    <section>
+      <h2>歷史庫與資料備份</h2>
+      <p class="sub" style="margin:0 0 12px;">分析結果存在這台瀏覽器的 localStorage。請定期匯出 JSON 備份——換電腦、清快取都會遺失資料。也可設定 Google Apps Script 端點，把歷史庫同步到共用試算表。</p>
+      <div class="controls" style="margin-bottom:6px;">
+        <button class="ghostBtn" id="exportJsonBtn">匯出歷史庫（JSON）</button>
+        <button class="ghostBtn" id="importJsonBtn">匯入 JSON 備份</button>
+        <input type="file" id="importJsonInput" accept=".json" style="display:none;">
+      </div>
+      <div class="controls" style="margin-bottom:14px;">
+        <input id="gasUrlInput" placeholder="Google Apps Script Web App URL（選填）" style="flex:1; min-width:260px;">
+        <button class="ghostBtn" id="gasSyncBtn">同步到雲端試算表</button>
+        <span class="progressText" id="gasSyncHint" style="margin-top:0;"></span>
+      </div>
+      <div id="historyList"><p class="empty">尚無歷史紀錄。完成分析後點上方「儲存本次分析到歷史庫」。</p></div>
+    </section>
   </div>
 </div>
+
+<!-- 週報圖卡模板（隱藏，匯出時渲染） -->
+<div id="reportCard" style="position:fixed; left:-9999px; top:0; width:1080px; background:#0E1526; color:#F2EDE3; font-family:'Microsoft JhengHei','PingFang TC',sans-serif; padding:48px 56px; box-sizing:border-box;"></div>
 
 <script>
 let angleChartInst=null, angleCpaChartInst=null, spChartInst=null;
@@ -275,6 +347,11 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
   document.getElementById('summaryPromptWrap').style.display='none';
   document.getElementById('geminiResultInput').value='';
   document.getElementById('summaryResultInput').value='';
+  document.getElementById('nameCheckPanel').innerHTML='';
+  document.getElementById('cycleHint').innerHTML='';
+  if(typeof cycleChartInst!=='undefined' && cycleChartInst){ cycleChartInst.destroy(); cycleChartInst=null; }
+  lastAiSummary=null;
+  window.__lastPerfSnapshot=null;
   genPromptBtn.disabled=true;
 });
 
@@ -315,11 +392,14 @@ function cleanMoney(x){
 function parseMaterialName(raw){
   const name = String(raw).split('\n')[0];
   const parts = name.split('_');
+  const seg = i => parts[i] ? parts[i].trim() : null;
   return {
-    格式: parts[0] || null,
-    視覺類型: parts[1] || null,
-    素材切角: parts[2] ? parts[2].trim() : null,
-    賣點: parts[3] ? parts[3].trim() : null,
+    格式: seg(0),
+    視覺類型: seg(1),
+    素材切角: seg(2),
+    賣點: seg(3),
+    走期: seg(4),
+    命名完整: parts.length>=5 && [0,1,2,3,4].every(i=>seg(i)),
     素材名稱: name
   };
 }
@@ -399,6 +479,7 @@ function parseSheet(sheetName){
   RAW = out;
   dashboard.style.display='block';
   imageMap = {};
+  renderNameCheck();
   renderAll();
   // 非同步從Excel擷取所有圖片 → 自動填入AI分析區
   extractAllMedia(rawBuffer, sheetName).then(images=>{
@@ -649,7 +730,7 @@ function renderAll(){
     <div class="card"><p class="label">素材總數</p><p class="value">${totalMaterials}</p></div>
     <div class="card"><p class="label">${ctxLabel}平均CTR</p><p class="value">${fmtPct(avgCTR)}</p></div>
     <div class="card"><p class="label">${ctxLabel}總花費</p><p class="value">${fmtMoney(totalCost)}</p></div>
-    <div class="card"><p class="label">表現最佳切角 <span style="font-size:10px; color:var(--text-muted);">CTR+CPA綜合</span></p><p class="value">${bestAngleKey}</p><p style="font-size:11px; color:var(--text-muted); margin:4px 0 0;">${bestAngleHint}</p></div>
+    <div class="card"><p class="label">表現最佳切角 <span style="font-size:10px; color:var(--text-muted);">CTR+CPA綜合</span></p><p class="value">${esc(bestAngleKey)}</p><p style="font-size:11px; color:var(--text-muted); margin:4px 0 0;">${bestAngleHint}</p></div>
   `;
 
   if(angleChartInst) angleChartInst.destroy();
@@ -670,23 +751,26 @@ function renderAll(){
   if(angleWithScore.length>=2){
     const best = angleWithScore[0], worst = angleWithScore[angleWithScore.length-1];
     insightsEl.innerHTML = `
-      <div class="insight"><b>${best.key}</b> 綜合表現最佳（CTR 排名第${best.ctrRank}、CPA 排名第${best.cpaRank}），點擊效率與轉換成本兼顧，建議優先擴大預算配置。</div>
-      <div class="insight bad"><b>${worst.key}</b> 綜合表現偏弱（CTR 排名第${worst.ctrRank}、CPA 排名第${worst.cpaRank}），建議結合具體福利或行動誘因再優化。</div>
+      <div class="insight"><b>${esc(best.key)}</b> 綜合表現最佳（CTR 排名第${best.ctrRank}、CPA 排名第${best.cpaRank}），點擊效率與轉換成本兼顧，建議優先擴大預算配置。</div>
+      <div class="insight bad"><b>${esc(worst.key)}</b> 綜合表現偏弱（CTR 排名第${worst.ctrRank}、CPA 排名第${worst.cpaRank}），建議結合具體福利或行動誘因再優化。</div>
     `;
   } else {
     insightsEl.innerHTML = '';
   }
 
   const spAgg = aggBy('賣點', perfData).sort((a,b)=>b.ctr-a.ctr);
+  const thr = getImprThreshold();
   if(spChartInst) spChartInst.destroy();
   spChartInst = new Chart(document.getElementById('sellingPointChart'), {
     type:'bar',
     data:{
-      labels: spAgg.map(d=>d.key),
+      labels: spAgg.map(d=> d.impr < thr ? d.key + ' ⚠' : d.key),
       datasets:[{label:'CTR', data: spAgg.map(d=>+(d.ctr*100).toFixed(2)),
-        backgroundColor: spAgg.map(d=> d.ctr>=avgCTR ? '#1d9e75' : '#f0997b')}]
+        backgroundColor: spAgg.map(d=> d.impr < thr ? '#c7c2b4' : (d.ctr>=avgCTR ? '#1d9e75' : '#f0997b'))}]
     },
-    options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{callback:v=>v+'%'}}} }
+    options:{ indexAxis:'y', plugins:{legend:{display:false},
+      tooltip:{callbacks:{afterLabel:(c)=>{ const d=spAgg[c.dataIndex]; return d.impr<thr ? `曝光 ${d.impr.toLocaleString()}（低於門檻 ${thr.toLocaleString()}，數據僅供參考）` : `曝光 ${d.impr.toLocaleString()}`; }}}},
+      scales:{x:{ticks:{callback:v=>v+'%'}}} }
   });
 
   const channelSel = document.getElementById('filterChannel');
@@ -696,6 +780,9 @@ function renderAll(){
   angleSel.innerHTML = '<option value="">所有切角</option>' + uniq(RAW.map(d=>d.素材切角)).map(c=>`<option>${c}</option>`).join('');
 
   renderTable();
+  renderCycleChart(perfData);
+  renderHypotheses(perfData);
+  window.__lastPerfSnapshot = { perfData, avgCTR, totalCost, angleWithScore, spAgg, ctxLabel };
 }
 
 function renderTable(){
@@ -715,20 +802,23 @@ function renderTable(){
     if(typeof av==='number' && typeof bv==='number') return (av-bv)*sortDir;
     return String(av||'').localeCompare(String(bv||''))*sortDir;
   });
+  const thr = getImprThreshold();
   document.getElementById('tableBody').innerHTML = rows.length ? rows.map(d=>{
+    const low = (d.曝光||0) < thr;
     return `
-    <tr>
-      <td>${d.渠道||'-'}</td>
-      <td>${d.格式||'-'}</td>
-      <td><span class="tag ${tagClass(d.素材切角)}">${d.素材切角||'-'}</span></td>
-      <td>${d.賣點||'-'}</td>
+    <tr class="${low?'lowSample':''}">
+      <td>${esc(d.渠道)||'-'}</td>
+      <td>${esc(d.格式)||'-'}</td>
+      <td><span class="tag ${tagClass(d.素材切角)}">${esc(d.素材切角)||'-'}</span></td>
+      <td>${esc(d.賣點)||'-'}</td>
+      <td>${esc(d.走期)||'-'}</td>
       <td>${fmtMoney(d.費用)}</td>
       <td>${fmtInt(d.點擊)}</td>
-      <td>${fmtPct(d.CTR)}</td>
+      <td>${fmtPct(d.CTR)}${low?'<span class="warnBadge">樣本不足</span>':''}</td>
       <td>${fmtInt(d.曝光)}</td>
       <td>${d.CPM!=null?'$'+Math.round(d.CPM):'-'}</td>
     </tr>
-  `}).join('') : `<tr><td colspan="9" class="empty">沒有符合條件的素材</td></tr>`;
+  `}).join('') : `<tr><td colspan="10" class="empty">沒有符合條件的素材</td></tr>`;
 }
 
 document.getElementById('downloadImgZipBtn').addEventListener('click', ()=>{
@@ -794,8 +884,8 @@ function handleImages(files){
 function renderImgGrid(){
   imgGrid.innerHTML = uploadedImages.map((img,i)=>`
     <div class="imgItem">
-      <img src="${img.dataUrl}" alt="${img.name}">
-      <div class="matchTag ${img.matchedRow?'':'noMatch'}">${img.matchedRow ? img.matchedRow.賣點 : '未配對成效'}</div>
+      <img src="${img.dataUrl}" alt="${esc(img.name)}">
+      <div class="matchTag ${img.matchedRow?'':'noMatch'}">${img.matchedRow ? esc(img.matchedRow.賣點) : '未配對成效'}</div>
     </div>
   `).join('');
   genPromptBtn.disabled = uploadedImages.length===0;
@@ -807,10 +897,14 @@ function parseJsonSafe(text){
     .replace(/```json\s*/g, '')       // 移除 markdown 標記
     .replace(/```\s*/g, '')
     .trim();
-  // 擷取第一個 [ ... ] 或 { ... } 區段
-  const arrMatch = clean.match(/(\[[\s\S]*\])/);
-  const objMatch = clean.match(/(\{[\s\S]*\})/);
-  const target = arrMatch ? arrMatch[1] : (objMatch ? objMatch[1] : clean);
+  // 依最外層括號的出現順序決定解析目標（物件在前就抓物件，避免誤抓內層陣列）
+  const firstObj = clean.indexOf('{'), firstArr = clean.indexOf('[');
+  let target = clean;
+  if(firstObj !== -1 && (firstArr === -1 || firstObj < firstArr)){
+    const m = clean.match(/(\{[\s\S]*\})/); if(m) target = m[1];
+  } else if(firstArr !== -1){
+    const m = clean.match(/(\[[\s\S]*\])/); if(m) target = m[1];
+  }
   try{ return JSON.parse(target); }catch(e){ return null; }
 }
 
@@ -829,10 +923,21 @@ const TAG_SCHEMA = `{
 
 genPromptBtn.addEventListener('click', ()=>{
   const fileList = uploadedImages.map(img=>`- ${img.name}`).join('\n');
+  const perfLines = uploadedImages
+    .filter(img=>img.matchedRow)
+    .map(img=>{
+      const r = img.matchedRow;
+      return `- ${img.name}｜賣點:${r.賣點}｜CTR:${r.CTR!=null?(r.CTR*100).toFixed(2)+'%':'-'}｜點擊:${r.點擊}｜曝光:${r.曝光}`;
+    }).join('\n');
   const prompt = `你是遊戲行銷素材分析師。我會上傳數張遊戲行銷素材圖片，檔名如下：
 ${fileList}
 
-請針對「每一張」圖片輸出結構化的視覺特徵標籤，欄位格式如下（檔名必須跟我提供的清單完全一致，用來對應）：
+以下是各素材的實際投放成效數據（CTR為點擊率，供你分析視覺與成效的關聯）：
+${perfLines || '（無配對成效數據）'}
+
+請完成兩件事：
+
+【任務一】針對「每一張」圖片輸出結構化的視覺特徵標籤，欄位格式如下（檔名必須跟我提供的清單完全一致，用來對應）：
 ${TAG_SCHEMA}
 
 補充判斷依據：
@@ -840,10 +945,13 @@ ${TAG_SCHEMA}
 - 「人物大小占比」請目測該人物在整張畫面中的面積比例。
 - 同一張圖若有多個人物，請以畫面中最主要/最大的人物為準。
 
-請回傳一個JSON陣列，包含每張圖片各一筆物件，不要任何其他文字、不要markdown標記、不要解釋，只回傳純JSON陣列。`;
+【任務二】結合上方成效數據與你標註的視覺特徵，用繁體中文寫出 2-4 點「哪些視覺特徵與高/低 CTR 相關」的具體洞察，以及下次製作素材的行動建議。
+
+請回傳「一個 JSON 物件」，格式如下，不要任何其他文字、不要markdown標記、不要解釋：
+{"標籤": [每張圖片各一筆的物件陣列], "洞察": "條列文字，換行用\\n"}`;
   document.getElementById('promptOutput').value = prompt;
   document.getElementById('promptWrap').style.display = 'block';
-  genPromptHint.textContent = `已產生 ${uploadedImages.length} 張圖片的分析 Prompt`;
+  genPromptHint.textContent = `已產生 ${uploadedImages.length} 張圖片的分析 Prompt（單次往返，標籤＋洞察）`;
 });
 
 document.getElementById('copyPromptBtn').addEventListener('click', ()=>{
@@ -874,17 +982,32 @@ document.getElementById('applyResultBtn').addEventListener('click', ()=>{
   const applyHint = document.getElementById('applyHint');
   if(!raw){ applyHint.textContent = '請先貼上 Gemini 回傳的內容'; applyHint.style.color = 'var(--coral)'; return; }
   const parsed = parseJsonSafe(raw);
-  if(!parsed || !Array.isArray(parsed)){
-    applyHint.textContent = '無法解析成 JSON 陣列，請確認貼上的內容是否完整、是否包含多餘文字';
+
+  // 支援兩種格式：合併物件 {標籤:[...], 洞察:"..."} 或舊版純陣列 [...]
+  let tagArr = null, insightText = null;
+  if(Array.isArray(parsed)){
+    tagArr = parsed;
+  } else if(parsed && Array.isArray(parsed.標籤)){
+    tagArr = parsed.標籤;
+    if(typeof parsed.洞察 === 'string' && parsed.洞察.trim()) insightText = parsed.洞察.trim();
+  }
+  if(!tagArr){
+    applyHint.textContent = '無法解析，請確認貼上的內容是完整的 JSON（物件含「標籤」陣列，或純陣列）';
     applyHint.style.color = 'var(--coral)';
     return;
   }
   aiResults = {};
-  parsed.forEach(item=>{
+  tagArr.forEach(item=>{
     if(item && item.檔名) aiResults[item.檔名] = item;
   });
   const matchedCount = uploadedImages.filter(img=>aiResults[img.name]).length;
-  applyHint.textContent = `已套用，成功對應 ${matchedCount}/${uploadedImages.length} 張圖片`;
+  if(insightText){
+    lastAiSummary = insightText;
+    document.getElementById('aiSummaryWrap').innerHTML = `<div class="aiSummary">${insightText.replace(/</g,'&lt;')}</div>`;
+    applyHint.textContent = `已套用，成功對應 ${matchedCount}/${uploadedImages.length} 張圖片，洞察摘要已一併顯示於下方`;
+  } else {
+    applyHint.textContent = `已套用，成功對應 ${matchedCount}/${uploadedImages.length} 張圖片（回傳未含洞察，可用下方選用步驟單獨產生）`;
+  }
   applyHint.style.color = 'var(--text-secondary)';
   renderAiTable();
   document.getElementById('summaryPromptWrap').style.display = 'block';
@@ -896,14 +1019,14 @@ function renderAiTable(){
     const tags = aiResults[img.name];
     const perf = img.matchedRow;
     const tagHtml = tags
-      ? Object.entries(tags).filter(([k])=>k!=='檔名').map(([k,v])=>`<span class="featTag">${k}:${v}</span>`).join('')
+      ? Object.entries(tags).filter(([k])=>k!=='檔名').map(([k,v])=>`<span class="featTag">${esc(k)}:${esc(v)}</span>`).join('')
       : '<span style="color:var(--text-muted); font-size:12px;">尚未套用分析結果</span>';
     return `
       <div style="display:flex; gap:14px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border);">
         <img src="${img.dataUrl}" style="width:60px; height:60px; object-fit:cover; border-radius:8px; flex-shrink:0;">
         <div style="flex:1; min-width:0;">
-          <p style="margin:0 0 4px; font-size:12.5px; font-weight:500;">${img.name}</p>
-          ${perf ? `<p style="margin:0 0 6px; font-size:11.5px; color:var(--text-secondary);">配對：${perf.賣點}　CTR ${fmtPct(perf.CTR)}　點擊 ${fmtInt(perf.點擊)}</p>` : `<p style="margin:0 0 6px; font-size:11.5px; color:var(--coral);">未配對到成效資料</p>`}
+          <p style="margin:0 0 4px; font-size:12.5px; font-weight:500;">${esc(img.name)}</p>
+          ${perf ? `<p style="margin:0 0 6px; font-size:11.5px; color:var(--text-secondary);">配對：${esc(perf.賣點)}　CTR ${fmtPct(perf.CTR)}　點擊 ${fmtInt(perf.點擊)}</p>` : `<p style="margin:0 0 6px; font-size:11.5px; color:var(--coral);">未配對到成效資料</p>`}
           <div>${tagHtml}</div>
         </div>
       </div>
@@ -959,8 +1082,370 @@ document.getElementById('applySummaryBtn').addEventListener('click', ()=>{
     summaryWrap.innerHTML = `<div class="errBox">請先貼上 Gemini 回傳的洞察摘要文字</div>`;
     return;
   }
+  lastAiSummary = text;
   summaryWrap.innerHTML = `<div class="aiSummary">${text.replace(/</g,'&lt;')}</div>`;
 });
+
+// ══════════════════════════════════════════════════════════
+// v2 新增功能：設定 / 命名驗證 / 走期疲勞 / 假設追蹤 / 歷史庫備份 / 週報圖卡
+// ══════════════════════════════════════════════════════════
+let lastAiSummary = null;
+const LS = { settings:'mt_settings', history:'mt_history', hypo:'mt_hypotheses' };
+const lsGet = (k, fb) => { try{ const v = JSON.parse(localStorage.getItem(k)); return v==null ? fb : v; }catch(e){ return fb; } };
+const lsSet = (k, v) => { try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ alert('localStorage 寫入失敗，可能已滿。請先匯出備份後清理歷史紀錄。'); } };
+// HTML 跳脫：任何來自 Excel／使用者輸入／AI 回傳的字串進 innerHTML 前都要過這層
+const esc = s => s==null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// SQA 修正：渠道情境切換原本沒有監聽，選了不會更新圖表
+document.getElementById('contextSelect').addEventListener('change', ()=>{ if(RAW.length) renderAll(); });
+
+// ── 設定（樣本門檻 / GAS URL）──────────────────────────
+function loadSettings(){
+  const s = lsGet(LS.settings, {});
+  if(s.imprThreshold != null) document.getElementById('imprThresholdInput').value = s.imprThreshold;
+  if(s.gasUrl) document.getElementById('gasUrlInput').value = s.gasUrl;
+}
+function saveSettings(){
+  lsSet(LS.settings, {
+    imprThreshold: getImprThreshold(),
+    gasUrl: document.getElementById('gasUrlInput').value.trim()
+  });
+}
+function getImprThreshold(){
+  const v = parseInt(document.getElementById('imprThresholdInput').value, 10);
+  return isNaN(v) || v < 0 ? 3000 : v;
+}
+document.getElementById('imprThresholdInput').addEventListener('change', ()=>{ saveSettings(); if(RAW.length) renderAll(); });
+document.getElementById('gasUrlInput').addEventListener('change', saveSettings);
+
+// ── 命名驗證器 ─────────────────────────────────────────
+function renderNameCheck(){
+  const panel = document.getElementById('nameCheckPanel');
+  if(!RAW.length){ panel.innerHTML=''; return; }
+  const bad = RAW.filter(d=>!d.命名完整);
+  const rate = Math.round((RAW.length - bad.length) / RAW.length * 100);
+  if(!bad.length){
+    panel.innerHTML = `<div class="checkPanel ok">✓ 命名檢查通過：${RAW.length} 筆素材全部符合「格式_視覺類型_切角_賣點_走期」五段式命名，配對成功率 100%。</div>`;
+    return;
+  }
+  const segNames = ['格式','視覺類型','素材切角','賣點','走期'];
+  const items = bad.slice(0, 12).map(d=>{
+    const missing = segNames.filter(k=>!d[k]).join('、');
+    return `<li><b>${esc(d.素材名稱)}</b> — 缺少：${missing || '段數不足'}</li>`;
+  }).join('');
+  panel.innerHTML = `
+    <div class="checkPanel warn">
+      ⚠ 命名檢查：${RAW.length} 筆中有 <b>${bad.length}</b> 筆不符合五段式命名（配對成功率 ${rate}%）。缺漏欄位會導致該素材在切角／賣點／走期分析中被歸入「未分類」，數據將失真。
+      <ul>${items}${bad.length>12?`<li>…另有 ${bad.length-12} 筆，請於明細表檢視</li>`:''}</ul>
+    </div>`;
+}
+
+// ── 走期疲勞分析 ───────────────────────────────────────
+let cycleChartInst = null;
+function renderCycleChart(perfData){
+  const hint = document.getElementById('cycleHint');
+  const withCycle = perfData.filter(d=>d.走期 && d.賣點);
+  if(cycleChartInst){ cycleChartInst.destroy(); cycleChartInst = null; }
+  if(!withCycle.length){
+    hint.innerHTML = `<p class="empty">目前資料沒有走期欄位。素材命名加上第 5 段走期（如 W1、W2）後即可啟用此分析。</p>`;
+    return;
+  }
+  // 走期排序：數字感排序（W1 < W2 < W10）
+  const cycles = [...new Set(withCycle.map(d=>d.走期))].sort((a,b)=>{
+    const na = parseInt(String(a).replace(/\D/g,''),10), nb = parseInt(String(b).replace(/\D/g,''),10);
+    if(!isNaN(na) && !isNaN(nb) && na!==nb) return na-nb;
+    return String(a).localeCompare(String(b));
+  });
+  // 依賣點分組，取曝光量前 6 大且橫跨 ≥2 個走期的素材
+  const bySp = {};
+  withCycle.forEach(d=>{
+    bySp[d.賣點] = bySp[d.賣點] || {impr:0, cycles:{}};
+    bySp[d.賣點].impr += d.曝光||0;
+    const c = bySp[d.賣點].cycles[d.走期] = bySp[d.賣點].cycles[d.走期] || {click:0, impr:0};
+    c.click += d.點擊||0; c.impr += d.曝光||0;
+  });
+  const eligible = Object.entries(bySp)
+    .filter(([,v])=>Object.keys(v.cycles).length>=2)
+    .sort((a,b)=>b[1].impr-a[1].impr).slice(0,6);
+  if(!eligible.length){
+    hint.innerHTML = `<p class="empty">尚無素材橫跨兩個以上走期，等下一波數據進來後這裡會自動顯示疲勞趨勢。</p>`;
+    return;
+  }
+  const palette = ['#0f6e56','#854f0b','#993c1d','#3d5a80','#7a5195','#5f7161'];
+  const datasets = eligible.map(([sp,v],i)=>({
+    label: sp,
+    data: cycles.map(cy=>{
+      const c = v.cycles[cy];
+      return c && c.impr ? +(c.click/c.impr*100).toFixed(2) : null;
+    }),
+    borderColor: palette[i%palette.length], backgroundColor: palette[i%palette.length],
+    spanGaps:true, tension:.2, pointRadius:4
+  }));
+  cycleChartInst = new Chart(document.getElementById('cycleChart'), {
+    type:'line',
+    data:{ labels:cycles, datasets },
+    options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:12, font:{size:11}}}},
+      scales:{ y:{ticks:{callback:v=>v+'%'}, title:{display:true, text:'CTR'}} } }
+  });
+  // 疲勞判讀：末走期 CTR 比峰值下滑 ≥30% 的素材點名
+  const fatigued = eligible.map(([sp,v])=>{
+    const pts = cycles.map(cy=>{ const c=v.cycles[cy]; return c&&c.impr ? c.click/c.impr : null; }).filter(x=>x!=null);
+    if(pts.length<2) return null;
+    const peak = Math.max(...pts), last = pts[pts.length-1];
+    return (peak>0 && (peak-last)/peak >= 0.3) ? {sp, drop: Math.round((peak-last)/peak*100)} : null;
+  }).filter(Boolean);
+  hint.innerHTML = fatigued.length
+    ? `<div class="insight bad" style="margin-top:12px;">疲勞警示：${fatigued.map(f=>`<b>${f.sp}</b>（CTR 較峰值下滑 ${f.drop}%）`).join('、')}，建議評估替換或更新素材。</div>`
+    : `<div class="insight" style="margin-top:12px;">目前追蹤中的素材尚無明顯疲勞跡象（判定標準：末走期 CTR 較峰值下滑 30% 以上）。</div>`;
+}
+
+// ── 假設追蹤（洞察驗證閉環）────────────────────────────
+function weightedCTR(rows){
+  const click = rows.reduce((s,d)=>s+(d.點擊||0),0);
+  const impr = rows.reduce((s,d)=>s+(d.曝光||0),0);
+  return impr ? click/impr : null;
+}
+function evalHypothesis(h, perfData){
+  const kw = h.keyword;
+  const withKw = perfData.filter(d=>(d.素材名稱||'').includes(kw) || (d.賣點||'').includes(kw));
+  const without = perfData.filter(d=>!withKw.includes(d));
+  const thr = getImprThreshold();
+  const imprWith = withKw.reduce((s,d)=>s+(d.曝光||0),0);
+  const ctrW = weightedCTR(withKw), ctrO = weightedCTR(without);
+  if(!withKw.length) return {status:'na', text:'本次資料無含關鍵字素材，無法驗證'};
+  if(ctrO==null) return {status:'na', text:'所有素材都含此關鍵字，缺少對照組，無法驗證'};
+  if(ctrW==null) return {status:'na', text:'含關鍵字素材無有效曝光數據'};
+  if(imprWith < thr) return {status:'na', text:`含關鍵字素材曝光僅 ${imprWith.toLocaleString()}（低於門檻），樣本不足`, ctrW, ctrO};
+  const lift = ctrO>0 ? (ctrW-ctrO)/ctrO*100 : 0;
+  return {
+    status: lift>=10 ? 'pass' : (lift<=-10 ? 'fail' : 'flat'),
+    lift, ctrW, ctrO, n: withKw.length,
+    text: `含「${kw}」${withKw.length} 支素材加權 CTR ${(ctrW*100).toFixed(2)}%，其他素材 ${(ctrO*100).toFixed(2)}%，差異 ${lift>=0?'+':''}${lift.toFixed(1)}%`
+  };
+}
+function renderHypotheses(perfData){
+  const list = document.getElementById('hypoList');
+  const hypos = lsGet(LS.hypo, []);
+  if(!hypos.length){ list.innerHTML = `<p class="empty">尚未建立假設。例：描述「加倒數標示可提升 CTR」＋關鍵字「倒數」。</p>`; return; }
+  list.innerHTML = hypos.map((h,i)=>{
+    const r = perfData ? evalHypothesis(h, perfData) : {status:'na', text:'上傳資料後自動驗證'};
+    const vClass = r.status==='pass' ? 'pass' : r.status==='fail' ? 'fail' : 'na';
+    const vLabel = {pass:'✓ 假設成立', fail:'✗ 假設未成立', flat:'— 無明顯差異', na:'…待驗證'}[r.status] || '…';
+    const hist = (h.history||[]).slice(-4).map(x=>`${x.date}：${x.lift>=0?'+':''}${x.lift.toFixed(1)}%`).join('　');
+    return `
+      <div class="hypoCard">
+        <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
+          <div style="flex:1;">
+            <b>${esc(h.desc)}</b> <span class="featTag">關鍵字：${esc(h.keyword)}</span>
+            <div style="margin-top:4px;"><span class="verdict ${vClass}">${vLabel}</span>　<span style="color:var(--text-secondary); font-size:12.5px;">${esc(r.text)}</span></div>
+            ${hist ? `<div class="hypoHist">歷次驗證：${hist}</div>` : ''}
+          </div>
+          <div style="display:flex; gap:6px; flex-shrink:0;">
+            ${r.lift!=null ? `<button class="ghostBtn" style="height:28px; font-size:11.5px;" onclick="recordHypo(${i})">記錄本次</button>` : ''}
+            <button class="ghostBtn" style="height:28px; font-size:11.5px;" onclick="removeHypo(${i})">刪除</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+window.recordHypo = function(i){
+  const hypos = lsGet(LS.hypo, []);
+  const snap = window.__lastPerfSnapshot;
+  if(!hypos[i] || !snap) return;
+  const r = evalHypothesis(hypos[i], snap.perfData);
+  if(r.lift==null){ alert('本次資料樣本不足，未記錄'); return; }
+  hypos[i].history = hypos[i].history || [];
+  hypos[i].history.push({ date: new Date().toISOString().slice(0,10), lift: r.lift, ctrW: r.ctrW, ctrO: r.ctrO, file: fileName.textContent });
+  lsSet(LS.hypo, hypos);
+  renderHypotheses(snap.perfData);
+};
+window.removeHypo = function(i){
+  const hypos = lsGet(LS.hypo, []);
+  if(!confirm(`刪除假設「${hypos[i]?.desc}」？歷次驗證紀錄會一併刪除。`)) return;
+  hypos.splice(i,1);
+  lsSet(LS.hypo, hypos);
+  renderHypotheses(window.__lastPerfSnapshot ? window.__lastPerfSnapshot.perfData : null);
+};
+document.getElementById('addHypoBtn').addEventListener('click', ()=>{
+  const desc = document.getElementById('hypoDesc').value.trim();
+  const keyword = document.getElementById('hypoKeyword').value.trim();
+  if(!desc || !keyword){ alert('請填寫假設描述與比對關鍵字'); return; }
+  const hypos = lsGet(LS.hypo, []);
+  hypos.push({desc, keyword, createdAt: new Date().toISOString().slice(0,10), history:[]});
+  lsSet(LS.hypo, hypos);
+  document.getElementById('hypoDesc').value=''; document.getElementById('hypoKeyword').value='';
+  renderHypotheses(window.__lastPerfSnapshot ? window.__lastPerfSnapshot.perfData : null);
+});
+
+// ── 歷史庫與備份 ───────────────────────────────────────
+function renderHistory(){
+  const list = document.getElementById('historyList');
+  const hist = lsGet(LS.history, []);
+  if(!hist.length){ list.innerHTML = `<p class="empty">尚無歷史紀錄。完成分析後點上方「儲存本次分析到歷史庫」。</p>`; return; }
+  list.innerHTML = hist.slice().reverse().map(rec=>`
+    <div class="histItem">
+      <div>
+        <b>${esc(rec.label)}</b>
+        <div class="meta">${esc(rec.savedAt)}　·　${rec.rows.length} 筆素材　·　${esc(rec.ctxLabel)||''}　平均CTR ${rec.avgCTR!=null?(rec.avgCTR*100).toFixed(2)+'%':'-'}${rec.aiSummary?'　·　含AI洞察':''}</div>
+      </div>
+      <button class="ghostBtn" onclick="deleteHistory('${esc(rec.id)}')">刪除</button>
+    </div>
+  `).join('');
+}
+window.deleteHistory = function(id){
+  let hist = lsGet(LS.history, []);
+  const rec = hist.find(r=>r.id===id);
+  if(!confirm(`刪除歷史紀錄「${rec?.label}」？`)) return;
+  hist = hist.filter(r=>r.id!==id);
+  lsSet(LS.history, hist);
+  renderHistory();
+};
+document.getElementById('saveHistoryBtn').addEventListener('click', ()=>{
+  if(!RAW.length){ alert('請先上傳並解析資料'); return; }
+  const snap = window.__lastPerfSnapshot || {};
+  const hist = lsGet(LS.history, []);
+  hist.push({
+    id: 'h' + Date.now(),
+    savedAt: new Date().toISOString().replace('T',' ').slice(0,16),
+    label: `${fileName.textContent} / ${sheetSelect.value}`,
+    ctxLabel: snap.ctxLabel || null,
+    avgCTR: snap.avgCTR != null ? snap.avgCTR : null,
+    totalCost: snap.totalCost != null ? snap.totalCost : null,
+    aiSummary: lastAiSummary,
+    rows: RAW.map(d=>({渠道:d.渠道, 素材名稱:d.素材名稱, 格式:d.格式, 素材切角:d.素材切角, 賣點:d.賣點, 走期:d.走期, 費用:d.費用, 點擊:d.點擊, 曝光:d.曝光, CTR:d.CTR, CPA:d.CPA}))
+  });
+  lsSet(LS.history, hist);
+  renderHistory();
+  alert('已儲存到歷史庫。提醒：localStorage 綁定這台瀏覽器，請定期匯出 JSON 備份。');
+});
+document.getElementById('exportJsonBtn').addEventListener('click', ()=>{
+  saveSettings(); // 先把當前 UI 上的設定寫入，避免未失焦的修改漏掉
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    version: 2,
+    history: lsGet(LS.history, []),
+    hypotheses: lsGet(LS.hypo, []),
+    settings: lsGet(LS.settings, {})
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `素材分析歷史庫備份_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 3000);
+});
+document.getElementById('importJsonBtn').addEventListener('click', ()=>document.getElementById('importJsonInput').click());
+document.getElementById('importJsonInput').addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    try{
+      const data = JSON.parse(ev.target.result);
+      // 以 id 合併歷史，避免重複；假設以描述+關鍵字去重
+      const cur = lsGet(LS.history, []);
+      const ids = new Set(cur.map(r=>r.id));
+      (data.history||[]).forEach(r=>{ if(r.id && !ids.has(r.id)) cur.push(r); });
+      lsSet(LS.history, cur);
+      const curH = lsGet(LS.hypo, []);
+      const keys = new Set(curH.map(h=>h.desc+'|'+h.keyword));
+      (data.hypotheses||[]).forEach(h=>{ if(!keys.has(h.desc+'|'+h.keyword)) curH.push(h); });
+      lsSet(LS.hypo, curH);
+      if(data.settings && typeof data.settings==='object'){ lsSet(LS.settings, Object.assign(lsGet(LS.settings, {}), data.settings)); loadSettings(); }
+      renderHistory();
+      renderHypotheses(window.__lastPerfSnapshot ? window.__lastPerfSnapshot.perfData : null);
+      alert(`匯入完成：歷史紀錄 ${cur.length} 筆、假設 ${curH.length} 條（已自動去重合併）`);
+    }catch(err){ alert('匯入失敗：不是有效的備份 JSON 檔'); }
+    e.target.value='';
+  };
+  reader.readAsText(f);
+});
+
+// ── GAS 雲端同步 ───────────────────────────────────────
+document.getElementById('gasSyncBtn').addEventListener('click', async ()=>{
+  const url = document.getElementById('gasUrlInput').value.trim();
+  const hintEl = document.getElementById('gasSyncHint');
+  if(!url){ hintEl.textContent = '請先貼上 GAS Web App URL（部署方式見說明書）'; return; }
+  saveSettings();
+  hintEl.textContent = '同步中…';
+  try{
+    // GAS Web App 標準模式：POST text/plain 避免 CORS preflight
+    await fetch(url, {
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ type:'materialToolSync', syncedAt:new Date().toISOString(), history: lsGet(LS.history, []), hypotheses: lsGet(LS.hypo, []) })
+    });
+    hintEl.textContent = '✓ 已送出同步請求，請到試算表確認資料（no-cors 模式無法讀取回應）';
+  }catch(err){ hintEl.textContent = '同步失敗：' + err.message; }
+});
+
+// ── 週報圖卡匯出 ───────────────────────────────────────
+document.getElementById('exportCardBtn').addEventListener('click', async ()=>{
+  const snap = window.__lastPerfSnapshot;
+  if(!snap){ alert('請先上傳並解析資料'); return; }
+  const { avgCTR, totalCost, angleWithScore, spAgg, ctxLabel } = snap;
+  const gold='#E8C877', sub='#9AA6BF', card='#1A2440', line='#2B3A5E';
+  const top3 = spAgg.slice(0,3);
+  const maxCtr = Math.max(...top3.map(d=>d.ctr), 0.0001);
+  const best = angleWithScore[0], worst = angleWithScore[angleWithScore.length-1];
+  const today = new Date().toISOString().slice(0,10);
+  const bar = d => `
+    <div style="display:flex; align-items:center; gap:14px; margin-bottom:12px;">
+      <div style="width:230px; font-size:15px; text-align:right; color:#F2EDE3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(d.key)}</div>
+      <div style="flex:1; background:${card}; border-radius:6px; height:26px; position:relative;">
+        <div style="width:${Math.round(d.ctr/maxCtr*100)}%; background:#D9A94E; height:26px; border-radius:6px;"></div>
+      </div>
+      <div style="width:80px; font-size:16px; font-weight:700; color:${gold};">${(d.ctr*100).toFixed(2)}%</div>
+    </div>`;
+  const el = document.getElementById('reportCard');
+  el.innerHTML = `
+    <div style="font-size:13px; letter-spacing:3px; color:${gold}; margin-bottom:6px;">LINEAGE M · WEEKLY CREATIVE REPORT</div>
+    <div style="font-size:30px; font-weight:700; margin-bottom:4px;">素材成效週報</div>
+    <div style="font-size:14px; color:${sub}; margin-bottom:28px;">${today}　·　${esc(ctxLabel)}　·　${esc(fileName.textContent)}</div>
+    <div style="display:flex; gap:16px; margin-bottom:28px;">
+      <div style="flex:1; background:${card}; border:1px solid ${line}; border-radius:12px; padding:18px 22px;">
+        <div style="font-size:13px; color:${sub};">平均 CTR</div>
+        <div style="font-size:34px; font-weight:700; color:${gold};">${(avgCTR*100).toFixed(2)}%</div>
+      </div>
+      <div style="flex:1; background:${card}; border:1px solid ${line}; border-radius:12px; padding:18px 22px;">
+        <div style="font-size:13px; color:${sub};">總花費</div>
+        <div style="font-size:34px; font-weight:700; color:#F2EDE3;">$${Math.round(totalCost).toLocaleString()}</div>
+      </div>
+      <div style="flex:1; background:${card}; border:1px solid ${line}; border-radius:12px; padding:18px 22px;">
+        <div style="font-size:13px; color:${sub};">最佳切角（CTR+CPA 綜合）</div>
+        <div style="font-size:26px; font-weight:700; color:${gold}; margin-top:4px;">${best ? esc(best.key) : '-'}</div>
+      </div>
+    </div>
+    <div style="font-size:16px; font-weight:600; color:${gold}; margin-bottom:14px;">賣點 CTR TOP 3</div>
+    ${top3.map(bar).join('')}
+    <div style="display:flex; gap:16px; margin-top:24px;">
+      <div style="flex:1; background:${card}; border-left:4px solid #6FBF8F; border-radius:8px; padding:14px 18px; font-size:14px;">
+        <b style="color:#6FBF8F;">高效</b>　${best ? `「${esc(best.key)}」綜合表現最佳（CTR 第${best.ctrRank}・CPA 第${best.cpaRank}），建議擴大預算。` : '-'}
+      </div>
+      <div style="flex:1; background:${card}; border-left:4px solid #C96B6B; border-radius:8px; padding:14px 18px; font-size:14px;">
+        <b style="color:#C96B6B;">偏弱</b>　${worst ? `「${esc(worst.key)}」綜合偏弱（CTR 第${worst.ctrRank}・CPA 第${worst.cpaRank}），建議補強行動誘因。` : '-'}
+      </div>
+    </div>
+    ${lastAiSummary ? `
+    <div style="margin-top:24px; background:${card}; border:1px solid ${line}; border-radius:12px; padding:18px 22px;">
+      <div style="font-size:15px; font-weight:600; color:${gold}; margin-bottom:8px;">AI 視覺洞察</div>
+      <div style="font-size:13.5px; line-height:1.8; white-space:pre-wrap; color:#F2EDE3;">${esc(lastAiSummary.slice(0,600))}</div>
+    </div>` : ''}
+    <div style="margin-top:28px; padding-top:16px; border-top:1px solid ${line}; font-size:12px; color:${sub};">天堂M 運營部 · 素材成效分析工具自動產出</div>
+  `;
+  try{
+    const canvas = await html2canvas(el, {backgroundColor:'#0E1526', scale:2});
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `素材成效週報_${today}.png`;
+    a.click();
+  }catch(err){ alert('圖卡產生失敗：' + err.message); }
+});
+
+// 初始化
+loadSettings();
+renderHistory();
+renderHypotheses(null);
 </script>
 </body>
 </html>

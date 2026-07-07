@@ -119,6 +119,20 @@
   .histItem{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); font-size:12.5px;}
   .histItem .meta{color:var(--text-muted); font-size:11.5px;}
   .histItem button{height:26px; font-size:11.5px; padding:0 10px;}
+  /* 特徵交叉驗證與素材對比 */
+  .crossTable{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px;}
+  .crossTable th,.crossTable td{padding:6px 10px; border-bottom:1px solid var(--border); text-align:left;}
+  .crossTable th{color:var(--text-secondary); font-weight:500;}
+  .crossDim{font-weight:600; background:#faf9f6;}
+  .liftUp{color:var(--teal); font-weight:600;}
+  .liftDown{color:var(--coral); font-weight:600;}
+  .liftFlat{color:var(--text-muted);}
+  .compareBar{display:flex; gap:10px; align-items:center; margin:14px 0 6px; flex-wrap:wrap;}
+  .cmpTable{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px;}
+  .cmpTable th,.cmpTable td{padding:7px 10px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top;}
+  .cmpTable th{color:var(--text-secondary); font-weight:500; width:110px;}
+  .cmpTable tr.diff td{background:var(--amber-bg);}
+  .cmpTable img{width:88px; height:88px; object-fit:cover; border-radius:8px;}
 </style>
 </head>
 <body>
@@ -222,7 +236,7 @@
         <span id="excelImgInfo"></span>
         <button class="primaryBtn" id="downloadImgZipBtn" style="height:28px; font-size:12px; padding:0 12px;">下載圖片包（.zip）</button>
       </div>
-      <p class="sub" style="margin:0 0 14px;">這個工具不直接呼叫 AI API，而是幫你產生 Prompt，你貼到 Gemini 視窗、上傳圖片取得結果後，再把結果貼回這裡合併進圖表與洞察。標籤涵蓋色調、人物類型（含AI生成判斷）、人物大小占比、動作姿態、表情、構圖密度、倒數/數字標示、CTA明確度、文字資訊量等九個維度。檔名建議包含賣點關鍵字（如「coupon倒數沙漏」）以利自動配對。</p>
+      <p class="sub" style="margin:0 0 14px;">這個工具不直接呼叫 AI API，而是幫你產生 Prompt，你貼到 Gemini 視窗、上傳圖片取得結果後，再把結果貼回這裡合併進圖表與洞察。標籤涵蓋色調、主色系（配色）、是否有人物、人物類型（含AI生成判斷）、人物大小占比、動作姿態、表情、構圖密度、版面配置、倒數/數字標示、CTA明確度、文字資訊量等十二個維度。檔名建議包含賣點關鍵字（如「coupon倒數沙漏」）以利自動配對。</p>
 
       <div class="imgUpload" id="imgUpload">
         <p class="main" style="font-size:13px;">點擊或拖曳素材圖片到這裡（僅用於配對預覽，不會上傳到任何伺服器）</p>
@@ -256,6 +270,8 @@
       </div>
 
       <div id="aiTableWrap" style="margin-top:18px;"></div>
+      <div id="featureCrossWrap" style="margin-top:18px;"></div>
+      <div id="compareWrap" style="margin-top:6px;"></div>
 
       <div id="summaryPromptWrap" style="display:none; margin-top:22px; border-top:1px solid var(--border); padding-top:18px;">
         <p style="font-size:13px; font-weight:500; margin:0 0 8px;">選用：單獨重新產生洞察摘要（若上一步已回傳洞察，可略過）</p>
@@ -349,6 +365,8 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
   document.getElementById('summaryResultInput').value='';
   document.getElementById('nameCheckPanel').innerHTML='';
   document.getElementById('cycleHint').innerHTML='';
+  document.getElementById('featureCrossWrap').innerHTML='';
+  document.getElementById('compareWrap').innerHTML='';
   if(typeof cycleChartInst!=='undefined' && cycleChartInst){ cycleChartInst.destroy(); cycleChartInst=null; }
   lastAiSummary=null;
   window.__lastPerfSnapshot=null;
@@ -911,11 +929,14 @@ function parseJsonSafe(text){
 const TAG_SCHEMA = `{
   "檔名":"完整檔名（須與我提供的檔名清單完全一致）",
   "色調":"暗色調或亮色調或中性",
+  "主色系":"紅色系或橙黃色系或金色系或綠色系或藍色系或紫色系或粉色系或黑白灰或多彩混合",
+  "是否有人物":"有或無",
   "人物類型":"無人物或真人實拍或AI生成人物或遊戲手繪立繪或3D建模",
   "人物大小占比":"無人物或臉部特寫(占畫面50%以上)或半身(占畫面25-50%)或全身(占畫面10-25%)或縮小背景(占畫面10%以下)",
   "人物動作姿態":"無人物或靜態站立或戰鬥攻擊動作或奔跑跳躍或坐姿或互動手勢(如比讚指向)或無法判斷",
   "表情情緒":"無人物或微笑親和或嚴肅冷峻或驚訝興奮或中性無表情或無法判斷",
   "構圖密度":"高留白(畫面簡潔)或低留白(畫面密集)",
+  "版面配置":"主體置中或左右分割或上下分割或滿版場景或文字資訊為主或多格拼貼",
   "是否有數字或倒數":"有或無，若有請說明是倒數計時/折扣數字/時長標示等何種類型",
   "CTA明確度":"明確(有清楚行動呼籲文字)或模糊或無",
   "文字資訊量":"高(大量文字說明)或中或低(幾乎無文字)"
@@ -941,6 +962,9 @@ ${perfLines || '（無配對成效數據）'}
 ${TAG_SCHEMA}
 
 補充判斷依據：
+- 「主色系」以畫面占比最大的色系為準；若無明顯主色（三種以上色系均衡分布）選「多彩混合」。
+- 「是否有人物」只要畫面出現可辨識的人形（含立繪、3D角色）即為「有」。
+- 「版面配置」判斷主視覺結構：主體在中央為「主體置中」；圖文左右各半為「左右分割」；上圖下文或反之為「上下分割」；整張為場景圖為「滿版場景」；以文字條列為主為「文字資訊為主」；多張小圖拼接為「多格拼貼」。
 - 「人物類型」要判斷是真人實拍照片/影片截圖、AI生成人像（觀察手指數量、皮膚紋理是否過於平滑、背景是否有變形扭曲等AI生成痕跡）、遊戲手繪立繪、還是3D建模角色，如果無法確定請選最接近的選項並可在後面加註「(不確定)」。
 - 「人物大小占比」請目測該人物在整張畫面中的面積比例。
 - 同一張圖若有多個人物，請以畫面中最主要/最大的人物為準。
@@ -1015,7 +1039,7 @@ document.getElementById('applyResultBtn').addEventListener('click', ()=>{
 
 function renderAiTable(){
   const wrap = document.getElementById('aiTableWrap');
-  const rows = uploadedImages.map(img=>{
+  const rows = uploadedImages.map((img,idx)=>{
     const tags = aiResults[img.name];
     const perf = img.matchedRow;
     const tagHtml = tags
@@ -1023,6 +1047,7 @@ function renderAiTable(){
       : '<span style="color:var(--text-muted); font-size:12px;">尚未套用分析結果</span>';
     return `
       <div style="display:flex; gap:14px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border);">
+        <input type="checkbox" class="cmpCheck" data-idx="${idx}" title="勾選以對比" style="margin-top:24px; width:16px; height:16px;">
         <img src="${img.dataUrl}" style="width:60px; height:60px; object-fit:cover; border-radius:8px; flex-shrink:0;">
         <div style="flex:1; min-width:0;">
           <p style="margin:0 0 4px; font-size:12.5px; font-weight:500;">${esc(img.name)}</p>
@@ -1032,7 +1057,106 @@ function renderAiTable(){
       </div>
     `;
   }).join('');
-  wrap.innerHTML = rows;
+  const bar = uploadedImages.length >= 2 ? `
+    <div class="compareBar">
+      <button class="ghostBtn" id="compareBtn">並排對比勾選素材（2–4 張）</button>
+      <span style="font-size:12px; color:var(--text-muted);">特徵值不一致的列會以底色標示，快速看出差在哪</span>
+    </div>` : '';
+  wrap.innerHTML = bar + rows;
+  document.getElementById('compareWrap').innerHTML = ''; // 資料已變，清除舊對比結果避免誤讀
+  const cb = document.getElementById('compareBtn');
+  if(cb) cb.addEventListener('click', renderCompare);
+  renderFeatureCross();
+}
+
+// ── 特徵 × 實際成效交叉驗證 ──────────────────────────
+// 回應使用者反饋：AI 判斷需搭配實際成效驗證 → 工具直接用實際 CTR 彙總各特徵值表現
+const CROSS_DIMS = ['色調','主色系','是否有人物','人物類型','人物大小占比','人物動作姿態','表情情緒','構圖密度','版面配置','是否有數字或倒數','CTA明確度','文字資訊量'];
+function renderFeatureCross(){
+  const wrap = document.getElementById('featureCrossWrap');
+  const records = uploadedImages
+    .filter(img => img.matchedRow && aiResults[img.name])
+    .map(img => ({ tags: aiResults[img.name], row: img.matchedRow }));
+  if(records.length < 2){ wrap.innerHTML = ''; return; }
+
+  const totImpr = records.reduce((s,r)=>s+(r.row.曝光||0),0);
+  const totClick = records.reduce((s,r)=>s+(r.row.點擊||0),0);
+  const overall = totImpr ? totClick/totImpr : 0;
+  const thr = getImprThreshold();
+
+  const dimBlocks = CROSS_DIMS.map(dim=>{
+    const g = {};
+    records.forEach(r=>{
+      let v = r.tags[dim];
+      if(v==null || v==='') return;
+      v = String(v);
+      const uncertain = v.includes('不確定');
+      const key = v.replace(/\s*[（(]不確定[)）]\s*/g,'').trim() || v;
+      g[key] = g[key] || {click:0, impr:0, n:0, uncertain:0};
+      g[key].click += r.row.點擊||0;
+      g[key].impr += r.row.曝光||0;
+      g[key].n++;
+      if(uncertain) g[key].uncertain++;
+    });
+    const vals = Object.entries(g).map(([k,v])=>({
+      key:k, n:v.n, impr:v.impr, uncertain:v.uncertain,
+      ctr: v.impr ? v.click/v.impr : null
+    })).filter(v=>v.ctr!=null).sort((a,b)=>b.ctr-a.ctr);
+    if(vals.length < 2) return ''; // 該維度全部同值，比不出差異
+    const rows = vals.map(v=>{
+      const lift = overall>0 ? (v.ctr-overall)/overall*100 : 0;
+      const liftCls = lift>=10 ? 'liftUp' : lift<=-10 ? 'liftDown' : 'liftFlat';
+      const lowN = v.impr < thr;
+      return `<tr>
+        <td></td>
+        <td>${esc(v.key)}${v.uncertain?` <span class="warnBadge">含${v.uncertain}筆AI不確定</span>`:''}</td>
+        <td>${v.n} 支</td>
+        <td>${(v.ctr*100).toFixed(2)}%${lowN?'<span class="warnBadge">樣本不足</span>':''}</td>
+        <td class="${liftCls}">${lift>=0?'+':''}${lift.toFixed(1)}%</td>
+      </tr>`;
+    }).join('');
+    return `<tr class="crossDim"><td colspan="5">${esc(dim)}</td></tr>${rows}`;
+  }).filter(Boolean).join('');
+
+  wrap.innerHTML = dimBlocks ? `
+    <h3 style="font-size:14px; margin:0 0 4px;">特徵 × 實際成效交叉驗證</h3>
+    <p class="sub" style="margin:0 0 4px;">以下用「實際投放 CTR」驗證各視覺特徵的表現（共 ${records.length} 支已配對素材，整體加權 CTR ${(overall*100).toFixed(2)}%）。差異欄為相對整體平均的幅度，±10% 內視為無明顯差異；標示「樣本不足」的僅供參考。</p>
+    <table class="crossTable">
+      <thead><tr><th style="width:8px;"></th><th>特徵值</th><th>素材數</th><th>加權 CTR（實際）</th><th>vs 整體</th></tr></thead>
+      <tbody>${dimBlocks}</tbody>
+    </table>` : `<p class="empty">已配對素材的特徵值皆相同，暫無可交叉比較的維度。</p>`;
+}
+
+// ── 素材並排對比 ─────────────────────────────────────
+function renderCompare(){
+  const wrap = document.getElementById('compareWrap');
+  const picked = [...document.querySelectorAll('.cmpCheck:checked')].map(c=>uploadedImages[+c.dataset.idx]).filter(Boolean);
+  if(picked.length < 2 || picked.length > 4){
+    wrap.innerHTML = `<div class="errBox">請勾選 2–4 張素材進行對比（目前 ${picked.length} 張）</div>`;
+    return;
+  }
+  const dims = ['CTR','點擊','曝光', ...CROSS_DIMS];
+  const rowVal = (img, dim)=>{
+    if(dim==='CTR') return img.matchedRow ? fmtPct(img.matchedRow.CTR) : '-';
+    if(dim==='點擊') return img.matchedRow ? fmtInt(img.matchedRow.點擊) : '-';
+    if(dim==='曝光') return img.matchedRow ? fmtInt(img.matchedRow.曝光) : '-';
+    const t = aiResults[img.name];
+    return t && t[dim]!=null ? String(t[dim]) : '-';
+  };
+  const bodyRows = dims.map(dim=>{
+    const vals = picked.map(img=>rowVal(img, dim));
+    const isFeature = CROSS_DIMS.includes(dim);
+    const differs = isFeature && new Set(vals.filter(v=>v!=='-')).size > 1;
+    return `<tr class="${differs?'diff':''}"><th>${esc(dim)}${differs?' ◆':''}</th>${vals.map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`;
+  }).join('');
+  wrap.innerHTML = `
+    <h3 style="font-size:14px; margin:14px 0 4px;">素材並排對比</h3>
+    <p class="sub" style="margin:0 0 4px;">底色列（◆）代表這些素材在該特徵上不一致——搭配 CTR 差異，就是「哪個元素造成成效落差」的第一線索。</p>
+    <div style="overflow-x:auto;">
+    <table class="cmpTable">
+      <tr><th>素材</th>${picked.map(img=>`<td><img src="${img.dataUrl}"><div style="font-size:11px; margin-top:4px; max-width:120px; word-break:break-all;">${esc(img.name)}</div></td>`).join('')}</tr>
+      ${bodyRows}
+    </table></div>`;
 }
 
 document.getElementById('genSummaryPromptBtn').addEventListener('click', ()=>{
@@ -1115,7 +1239,11 @@ function getImprThreshold(){
   const v = parseInt(document.getElementById('imprThresholdInput').value, 10);
   return isNaN(v) || v < 0 ? 3000 : v;
 }
-document.getElementById('imprThresholdInput').addEventListener('change', ()=>{ saveSettings(); if(RAW.length) renderAll(); });
+document.getElementById('imprThresholdInput').addEventListener('change', ()=>{
+  saveSettings();
+  if(RAW.length) renderAll();
+  if(Object.keys(aiResults).length) renderFeatureCross(); // 交叉表的「樣本不足」徽章同步更新
+});
 document.getElementById('gasUrlInput').addEventListener('change', saveSettings);
 
 // ── 命名驗證器 ─────────────────────────────────────────

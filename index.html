@@ -120,6 +120,28 @@
   .histItem .meta{color:var(--text-muted); font-size:11.5px;}
   .histItem button{height:26px; font-size:11.5px; padding:0 10px;}
   /* 特徵交叉驗證與素材對比 */
+  .mkItem{display:flex; gap:12px; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:12.5px;}
+  .mkItem img{width:56px; height:56px; object-fit:cover; border-radius:8px; flex-shrink:0;}
+  .mkMeta{color:var(--text-muted); font-size:11.5px;}
+  .mvRow{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+  .mvLabel{width:104px; font-size:11.5px; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0;}
+  .mvPair{flex:1;}
+  .mvBarWrap{display:flex; align-items:center; gap:6px; height:14px; margin:1px 0;}
+  .mvBar{height:12px; border-radius:3px;}
+  .mvPct{font-size:10.5px; color:var(--text-secondary); white-space:nowrap;}
+  .gapChip{display:inline-flex; align-items:center; gap:8px; border:1px solid var(--amber); background:var(--amber-bg); border-radius:8px; padding:6px 10px; font-size:12px; color:var(--amber); margin:0 8px 8px 0;}
+  .gapChip button{height:24px; font-size:11px; padding:0 8px; border:1px solid var(--amber); border-radius:6px; background:transparent; color:var(--amber); cursor:pointer;}
+  .fxGrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:12px; margin-top:12px;}
+  .fxCard{border:1px solid var(--border); border-radius:10px; padding:12px 14px; background:var(--surface);}
+  .fxImpactCard{border:1px solid var(--border); border-radius:10px; padding:12px 14px 6px; background:var(--surface); margin-bottom:4px;}
+  .fxDim{font-size:13px; font-weight:600; color:var(--teal); margin-bottom:8px;}
+  .fxRow{display:flex; align-items:center; gap:8px; margin-bottom:7px;}
+  .fxLabel{width:104px; font-size:11.5px; color:var(--text); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0;}
+  .fxTrack{flex:1; height:16px; background:#f1efe9; border-radius:4px; position:relative; overflow:visible;}
+  .fxBar{height:16px; border-radius:4px;}
+  .fxAvg{position:absolute; top:-2px; bottom:-2px; width:0; border-left:2px dashed #9a948a;}
+  .fxVal{font-size:11.5px; color:var(--text); white-space:nowrap; flex-shrink:0;}
+  .fxVal .fxN{color:var(--text-muted);}
   .crossTable{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px;}
   .crossTable th,.crossTable td{padding:6px 10px; border-bottom:1px solid var(--border); text-align:left;}
   .crossTable th{color:var(--text-secondary); font-weight:500;}
@@ -236,7 +258,7 @@
         <span id="excelImgInfo"></span>
         <button class="primaryBtn" id="downloadImgZipBtn" style="height:28px; font-size:12px; padding:0 12px;">下載圖片包（.zip）</button>
       </div>
-      <p class="sub" style="margin:0 0 14px;">這個工具不直接呼叫 AI API，而是幫你產生 Prompt，你貼到 Gemini 視窗、上傳圖片取得結果後，再把結果貼回這裡合併進圖表與洞察。標籤涵蓋色調、主色系（配色）、是否有人物、人物類型（含AI生成判斷）、人物大小占比、動作姿態、表情、構圖密度、版面配置、倒數/數字標示、CTA明確度、文字資訊量等十二個維度。檔名建議包含賣點關鍵字（如「coupon倒數沙漏」）以利自動配對。</p>
+      <p class="sub" style="margin:0 0 14px;">這個工具不直接呼叫 AI API，而是幫你產生 Prompt，你貼到 Gemini 視窗、上傳圖片取得結果後，再把結果貼回這裡合併進圖表與洞察。標籤涵蓋畫面構成 12 維（色調、主色系、人物、版面配置、CTA…）＋內容策略 6 維（訴求類型、品牌露出、遊戲畫面、特效強度、獎勵元素、懷舊元素），共 18 個維度。檔名建議包含賣點關鍵字（如「coupon倒數沙漏」）以利自動配對。</p>
 
       <div class="imgUpload" id="imgUpload">
         <p class="main" style="font-size:13px;">點擊或拖曳素材圖片到這裡（僅用於配對預覽，不會上傳到任何伺服器）</p>
@@ -245,6 +267,15 @@
 
       <div class="imgGrid" id="imgGrid"></div>
 
+      <div style="border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:14px; background:var(--surface);">
+        <p style="font-size:13px; font-weight:600; margin:0 0 8px;">自訂分析維度 <span style="font-weight:400; color:var(--text-muted); font-size:12px;">預設 18 維之外，可依本次分析需求加入新維度（會自動加入 Prompt 與所有對比圖）</span></p>
+        <div class="controls" style="margin-bottom:8px;">
+          <input id="cdName" placeholder="維度名稱，例：季節氛圍" style="width:170px;">
+          <input id="cdHint" placeholder="選項提示，例：春節或夏日或萬聖節或無" style="flex:1; min-width:220px;">
+          <button class="ghostBtn" id="cdAddBtn">新增維度</button>
+        </div>
+        <div id="cdList"></div>
+      </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <button class="primaryBtn" id="genPromptBtn" disabled>步驟1：產生分析 Prompt（標籤＋洞察一次完成）</button>
         <span class="progressText" id="genPromptHint"></span>
@@ -299,6 +330,40 @@
         <button class="primaryBtn" id="addHypoBtn" style="height:32px; font-size:12.5px;">新增假設</button>
       </div>
       <div id="hypoList"></div>
+    </section>
+
+    <section>
+      <h2>市場素材庫（競品對比）</h2>
+      <p class="sub" style="margin:0 0 12px;">上傳市場上其他遊戲的廣告素材（來源：Meta 廣告檔案庫、Google 透明度中心、AppGrowing 等），以同一套 18 維標準分析，與我方素材做特徵分佈對比。資料永久保存於本瀏覽器，備份時一併匯出。</p>
+      <div class="controls" style="margin-bottom:10px;">
+        <input id="mkGame" placeholder="遊戲名稱，例：天堂W" style="width:170px;">
+        <input id="mkSource" placeholder="來源，例：Meta廣告庫" style="width:150px;">
+        <input id="mkDate" type="date" title="首見日期（用於計算存活天數）">
+        <button class="ghostBtn" id="mkUploadBtn">選擇圖片加入</button>
+        <input type="file" id="mkUploadInput" accept="image/*" multiple style="display:none;">
+        <button class="ghostBtn" id="mkFormImportBtn">從 Google 表單匯入</button>
+        <span class="progressText" id="mkFormHint" style="margin-top:0;"></span>
+      </div>
+      <div id="mkList"><p class="empty">尚無市場素材。填好遊戲名稱與首見日期後選擇圖片加入。</p></div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+        <button class="primaryBtn" id="mkGenPromptBtn" style="height:34px; font-size:13px;">產生市場素材分析 Prompt</button>
+        <button class="ghostBtn" id="mkClearTaggedBtn" style="display:none;"></button>
+      </div>
+      <div id="mkPromptWrap" style="display:none; margin-top:12px;">
+        <textarea id="mkPromptOutput" readonly style="width:100%; height:110px; font-family:var(--font-mono,monospace); font-size:11.5px; border:1px solid var(--border-strong); border-radius:8px; padding:10px;"></textarea>
+        <div style="margin-top:8px;">
+          <textarea id="mkResultInput" placeholder="把 Gemini 回傳的 JSON 貼在這裡" style="width:100%; height:100px; font-family:var(--font-mono,monospace); font-size:11.5px; border:1px solid var(--border-strong); border-radius:8px; padding:10px;"></textarea>
+          <button class="primaryBtn" id="mkApplyBtn" style="margin-top:8px; height:32px; font-size:13px;">套用市場標籤</button>
+          <span class="progressText" id="mkApplyHint"></span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>我方 × 市場 特徵分佈對比</h2>
+      <p class="sub" style="margin:0 0 12px;">比較的是「特徵出現占比」而非成效（競品成效不可得）。市場端以存活天數加權（上限 120 天，存活越久代表越可能在跑量）；缺口 ≥15 個百分點的特徵會列為建議關注。</p>
+      <div id="mvsWrap"><p class="empty">需要我方 ≥3 支已標籤素材＋市場 ≥3 支已標籤素材，對比會自動出現。</p></div>
+      <div id="mvsGaps"></div>
     </section>
 
     <section>
@@ -368,6 +433,7 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
   document.getElementById('featureCrossWrap').innerHTML='';
   document.getElementById('compareWrap').innerHTML='';
   if(typeof cycleChartInst!=='undefined' && cycleChartInst){ cycleChartInst.destroy(); cycleChartInst=null; }
+  if(typeof crossImpactInst!=='undefined' && crossImpactInst){ crossImpactInst.destroy(); crossImpactInst=null; }
   lastAiSummary=null;
   window.__lastPerfSnapshot=null;
   genPromptBtn.disabled=true;
@@ -939,21 +1005,32 @@ function parseJsonSafe(text){
   try{ return JSON.parse(target); }catch(e){ return null; }
 }
 
-const TAG_SCHEMA = `{
-  "檔名":"完整檔名（須與我提供的檔名清單完全一致）",
-  "色調":"暗色調或亮色調或中性",
-  "主色系":"紅色系或橙黃色系或金色系或綠色系或藍色系或紫色系或粉色系或黑白灰或多彩混合",
-  "是否有人物":"有或無",
-  "人物類型":"無人物或真人實拍或AI生成人物或遊戲手繪立繪或3D建模",
-  "人物大小占比":"無人物或臉部特寫(占畫面50%以上)或半身(占畫面25-50%)或全身(占畫面10-25%)或縮小背景(占畫面10%以下)",
-  "人物動作姿態":"無人物或靜態站立或戰鬥攻擊動作或奔跑跳躍或坐姿或互動手勢(如比讚指向)或無法判斷",
-  "表情情緒":"無人物或微笑親和或嚴肅冷峻或驚訝興奮或中性無表情或無法判斷",
-  "構圖密度":"高留白(畫面簡潔)或低留白(畫面密集)",
-  "版面配置":"主體置中或左右分割或上下分割或滿版場景或文字資訊為主或多格拼貼",
-  "是否有數字或倒數":"有或無，若有請說明是倒數計時/折扣數字/時長標示等何種類型",
-  "CTA明確度":"明確(有清楚行動呼籲文字)或模糊或無",
-  "文字資訊量":"高(大量文字說明)或中或低(幾乎無文字)"
-}`;
+const TAG_FIELDS = [
+  ["檔名","完整檔名（須與我提供的檔名清單完全一致）"],
+  ["色調","暗色調或亮色調或中性"],
+  ["主色系","紅色系或橙黃色系或金色系或綠色系或藍色系或紫色系或粉色系或黑白灰或多彩混合"],
+  ["是否有人物","有或無"],
+  ["人物類型","無人物或真人實拍或AI生成人物或遊戲手繪立繪或3D建模"],
+  ["人物大小占比","無人物或臉部特寫(占畫面50%以上)或半身(占畫面25-50%)或全身(占畫面10-25%)或縮小背景(占畫面10%以下)"],
+  ["人物動作姿態","無人物或靜態站立或戰鬥攻擊動作或奔跑跳躍或坐姿或互動手勢(如比讚指向)或無法判斷"],
+  ["表情情緒","無人物或微笑親和或嚴肅冷峻或驚訝興奮或中性無表情或無法判斷"],
+  ["構圖密度","高留白(畫面簡潔)或低留白(畫面密集)"],
+  ["版面配置","主體置中或左右分割或上下分割或滿版場景或文字資訊為主或多格拼貼"],
+  ["是否有數字或倒數","有或無，若有請說明是倒數計時/折扣數字/時長標示等何種類型"],
+  ["CTA明確度","明確(有清楚行動呼籲文字)或模糊或無"],
+  ["文字資訊量","高(大量文字說明)或中或低(幾乎無文字)"],
+  ["訴求類型","促銷優惠或情感懷舊或實力展示或內容資訊或懸念好奇"],
+  ["品牌LOGO露出","明顯或角落小型或無"],
+  ["遊戲畫面展示","實機介面或純美術或混合"],
+  ["特效強度","高或中或低"],
+  ["獎勵元素","虛寶金幣或裝備道具或轉蛋抽獎或無"],
+  ["懷舊元素","有或無"]
+];
+function getCustomDims(){ return lsGet(LS.customDims, []); }
+function getTagSchema(){
+  const fields = TAG_FIELDS.concat(getCustomDims().map(d=>[d.name, d.hint || '請依素材內容判斷']));
+  return '{\n' + fields.map(([k,v])=>`  "${k}":"${v}"`).join(',\n') + '\n}';
+}
 
 genPromptBtn.addEventListener('click', ()=>{
   const fileList = uploadedImages.map(img=>`- ${img.name}`).join('\n');
@@ -972,12 +1049,15 @@ ${perfLines || '（無配對成效數據）'}
 請完成兩件事：
 
 【任務一】針對「每一張」圖片輸出結構化的視覺特徵標籤，欄位格式如下（檔名必須跟我提供的清單完全一致，用來對應）：
-${TAG_SCHEMA}
+${getTagSchema()}
 
 補充判斷依據：
 - 「主色系」以畫面占比最大的色系為準；若無明顯主色（三種以上色系均衡分布）選「多彩混合」。
 - 「是否有人物」只要畫面出現可辨識的人形（含立繪、3D角色）即為「有」。
 - 「版面配置」判斷主視覺結構：主體在中央為「主體置中」；圖文左右各半為「左右分割」；上圖下文或反之為「上下分割」；整張為場景圖為「滿版場景」；以文字條列為主為「文字資訊為主」；多張小圖拼接為「多格拼貼」。
+- 「訴求類型」判斷素材的核心策略：主打折扣/贈品為「促銷優惠」；喚起回憶/兄弟情懷為「情感懷舊」；展示強度/裝備/戰力為「實力展示」；解說玩法/版本內容為「內容資訊」；賣關子引好奇為「懸念好奇」。
+- 「遊戲畫面展示」：出現真實遊戲UI（血條/技能欄/小地圖）為「實機介面」；僅宣傳美術為「純美術」；兩者皆有為「混合」。
+- 「懷舊元素」：出現經典舊版畫面、像素風、「當年/回憶/N年前」等懷舊語彙即為「有」。
 - 「人物類型」要判斷是真人實拍照片/影片截圖、AI生成人像（觀察手指數量、皮膚紋理是否過於平滑、背景是否有變形扭曲等AI生成痕跡）、遊戲手繪立繪、還是3D建模角色，如果無法確定請選最接近的選項並可在後面加註「(不確定)」。
 - 「人物大小占比」請目測該人物在整張畫面中的面積比例。
 - 同一張圖若有多個人物，請以畫面中最主要/最大的人物為準。
@@ -1080,16 +1160,20 @@ function renderAiTable(){
   const cb = document.getElementById('compareBtn');
   if(cb) cb.addEventListener('click', renderCompare);
   renderFeatureCross();
+  renderMarketCompare();
 }
 
 // ── 特徵 × 實際成效交叉驗證 ──────────────────────────
 // 回應使用者反饋：AI 判斷需搭配實際成效驗證 → 工具直接用實際 CTR 彙總各特徵值表現
-const CROSS_DIMS = ['色調','主色系','是否有人物','人物類型','人物大小占比','人物動作姿態','表情情緒','構圖密度','版面配置','是否有數字或倒數','CTA明確度','文字資訊量'];
+const CROSS_DIMS = ['色調','主色系','是否有人物','人物類型','人物大小占比','人物動作姿態','表情情緒','構圖密度','版面配置','是否有數字或倒數','CTA明確度','文字資訊量','訴求類型','品牌LOGO露出','遊戲畫面展示','特效強度','獎勵元素','懷舊元素'];
+function allCrossDims(){ return CROSS_DIMS.concat(getCustomDims().map(d=>d.name)); }
+let crossImpactInst = null;
 function renderFeatureCross(){
   const wrap = document.getElementById('featureCrossWrap');
   const records = uploadedImages
     .filter(img => img.matchedRow && aiResults[img.name])
     .map(img => ({ tags: aiResults[img.name], row: img.matchedRow }));
+  if(crossImpactInst){ crossImpactInst.destroy(); crossImpactInst = null; }
   if(records.length < 2){ wrap.innerHTML = ''; return; }
 
   const totImpr = records.reduce((s,r)=>s+(r.row.曝光||0),0);
@@ -1097,7 +1181,10 @@ function renderFeatureCross(){
   const overall = totImpr ? totClick/totImpr : 0;
   const thr = getImprThreshold();
 
-  const dimBlocks = CROSS_DIMS.map(dim=>{
+  // 彙總各維度
+  const dimData = [];
+  const impact = [];
+  allCrossDims().forEach(dim=>{
     const g = {};
     records.forEach(r=>{
       let v = r.tags[dim];
@@ -1106,38 +1193,69 @@ function renderFeatureCross(){
       const uncertain = v.includes('不確定');
       const key = v.replace(/\s*[（(]不確定[)）]\s*/g,'').trim() || v;
       g[key] = g[key] || {click:0, impr:0, n:0, uncertain:0};
-      g[key].click += r.row.點擊||0;
-      g[key].impr += r.row.曝光||0;
-      g[key].n++;
+      g[key].click += r.row.點擊||0; g[key].impr += r.row.曝光||0; g[key].n++;
       if(uncertain) g[key].uncertain++;
     });
     const vals = Object.entries(g).map(([k,v])=>({
       key:k, n:v.n, impr:v.impr, uncertain:v.uncertain,
       ctr: v.impr ? v.click/v.impr : null
     })).filter(v=>v.ctr!=null).sort((a,b)=>b.ctr-a.ctr);
-    if(vals.length < 2) return ''; // 該維度全部同值，比不出差異
-    const rows = vals.map(v=>{
+    if(vals.length < 2) return;
+    dimData.push({dim, vals});
+    vals.forEach(v=>{
       const lift = overall>0 ? (v.ctr-overall)/overall*100 : 0;
-      const liftCls = lift>=10 ? 'liftUp' : lift<=-10 ? 'liftDown' : 'liftFlat';
-      const lowN = v.impr < thr;
-      return `<tr>
-        <td></td>
-        <td>${esc(v.key)}${v.uncertain?` <span class="warnBadge">含${v.uncertain}筆AI不確定</span>`:''}</td>
-        <td>${v.n} 支</td>
-        <td>${(v.ctr*100).toFixed(2)}%${lowN?'<span class="warnBadge">樣本不足</span>':''}</td>
-        <td class="${liftCls}">${lift>=0?'+':''}${lift.toFixed(1)}%</td>
-      </tr>`;
-    }).join('');
-    return `<tr class="crossDim"><td colspan="5">${esc(dim)}</td></tr>${rows}`;
-  }).filter(Boolean).join('');
+      if(v.n>=2 && v.impr>=thr) impact.push({label:`${dim}·${v.key}`, lift});
+    });
+  });
 
-  wrap.innerHTML = dimBlocks ? `
-    <h3 style="font-size:14px; margin:0 0 4px;">特徵 × 實際成效交叉驗證</h3>
-    <p class="sub" style="margin:0 0 4px;">以下用「實際投放 CTR」驗證各視覺特徵的表現（共 ${records.length} 支已配對素材，整體加權 CTR ${(overall*100).toFixed(2)}%）。差異欄為相對整體平均的幅度，±10% 內視為無明顯差異；標示「樣本不足」的僅供參考。</p>
-    <table class="crossTable">
-      <thead><tr><th style="width:8px;"></th><th>特徵值</th><th>素材數</th><th>加權 CTR（實際）</th><th>vs 整體</th></tr></thead>
-      <tbody>${dimBlocks}</tbody>
-    </table>` : `<p class="empty">已配對素材的特徵值皆相同，暫無可交叉比較的維度。</p>`;
+  if(!dimData.length){
+    wrap.innerHTML = `<p class="empty">已配對素材的特徵值皆相同，暫無可交叉比較的維度。</p>`;
+    return;
+  }
+
+  // 影響力排行（|lift| 最大的前 10）
+  impact.sort((a,b)=>Math.abs(b.lift)-Math.abs(a.lift));
+  const top = impact.slice(0,10).sort((a,b)=>b.lift-a.lift);
+
+  // 維度卡網格：每個特徵值一根橫條，寬度∝CTR，顏色依 lift
+  const cards = dimData.map(({dim, vals})=>{
+    const maxCtr = Math.max(...vals.map(v=>v.ctr), 1e-9); // 防全零 CTR 除以 0
+    const bars = vals.map(v=>{
+      const lift = overall>0 ? (v.ctr-overall)/overall*100 : 0;
+      const color = lift>=10 ? 'var(--teal)' : lift<=-10 ? 'var(--coral)' : '#b8b2a4';
+      const wpct = Math.max(6, Math.round(v.ctr/maxCtr*100));
+      const badges = `${v.impr<thr?'<span class="warnBadge">樣本不足</span>':''}${v.uncertain?`<span class="warnBadge">含${v.uncertain}筆不確定</span>`:''}`;
+      return `
+        <div class="fxRow">
+          <div class="fxLabel" title="${esc(v.key)}">${esc(v.key)}</div>
+          <div class="fxTrack">
+            <div class="fxBar" style="width:${wpct}%; background:${color};"></div>
+            <div class="fxAvg" style="left:${Math.min(98, overall/maxCtr*100)}%;"></div>
+          </div>
+          <div class="fxVal">${(v.ctr*100).toFixed(2)}% <span class="fxN">${v.n}支</span>${badges}</div>
+        </div>`;
+    }).join('');
+    return `<div class="fxCard"><div class="fxDim">${esc(dim)}</div>${bars}</div>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <h3 style="font-size:14px; margin:0 0 4px;">特徵 × 實際成效圖版</h3>
+    <p class="sub" style="margin:0 0 10px;">每格一個維度：橫條長度＝該特徵值的實際加權 CTR，<span style="color:var(--teal); font-weight:600;">綠</span>＝高於整體 10% 以上、<span style="color:var(--coral); font-weight:600;">紅</span>＝低於 10% 以上、灰＝無明顯差異；虛線＝整體平均 ${(overall*100).toFixed(2)}%（共 ${records.length} 支已配對素材）</p>
+    ${top.length>=3 ? `<div class="fxImpactCard"><div class="fxDim">特徵影響力排行（vs 整體平均 %）</div><canvas id="crossImpactChart" style="max-height:${Math.max(180, top.length*30+40)}px;"></canvas></div>` : ''}
+    <div class="fxGrid">${cards}</div>`;
+
+  if(top.length>=3){
+    crossImpactInst = new Chart(document.getElementById('crossImpactChart'), {
+      type:'bar',
+      data:{ labels: top.map(t=>t.label),
+        datasets:[{ data: top.map(t=>+t.lift.toFixed(1)),
+          backgroundColor: top.map(t=>t.lift>=0?'#1d9e75':'#d97b62') }] },
+      options:{ indexAxis:'y', plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:c=>`${c.raw>=0?'+':''}${c.raw}% vs 整體`}}},
+        scales:{ x:{ticks:{callback:v=>(v>=0?'+':'')+v+'%'}, grid:{color:'#eceae4'}},
+                 y:{ticks:{font:{size:11}}, grid:{display:false}} } }
+    });
+  }
 }
 
 // ── 素材並排對比 ─────────────────────────────────────
@@ -1148,7 +1266,7 @@ function renderCompare(){
     wrap.innerHTML = `<div class="errBox">請勾選 2–4 張素材進行對比（目前 ${picked.length} 張）</div>`;
     return;
   }
-  const dims = ['CTR','點擊','曝光', ...CROSS_DIMS];
+  const dims = ['CTR','點擊','曝光', ...allCrossDims()];
   const rowVal = (img, dim)=>{
     if(dim==='CTR') return img.matchedRow ? fmtPct(img.matchedRow.CTR) : '-';
     if(dim==='點擊') return img.matchedRow ? fmtInt(img.matchedRow.點擊) : '-';
@@ -1158,7 +1276,7 @@ function renderCompare(){
   };
   const bodyRows = dims.map(dim=>{
     const vals = picked.map(img=>rowVal(img, dim));
-    const isFeature = CROSS_DIMS.includes(dim);
+    const isFeature = allCrossDims().includes(dim);
     const differs = isFeature && new Set(vals.filter(v=>v!=='-')).size > 1;
     return `<tr class="${differs?'diff':''}"><th>${esc(dim)}${differs?' ◆':''}</th>${vals.map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`;
   }).join('');
@@ -1466,6 +1584,8 @@ document.getElementById('exportJsonBtn').addEventListener('click', ()=>{
     version: 2,
     history: lsGet(LS.history, []),
     hypotheses: lsGet(LS.hypo, []),
+    market: lsGet(LS.market, []),
+    customDims: lsGet(LS.customDims, []),
     settings: lsGet(LS.settings, {})
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
@@ -1492,6 +1612,20 @@ document.getElementById('importJsonInput').addEventListener('change', e=>{
       const keys = new Set(curH.map(h=>h.desc+'|'+h.keyword));
       (data.hypotheses||[]).forEach(h=>{ if(!keys.has(h.desc+'|'+h.keyword)) curH.push(h); });
       lsSet(LS.hypo, curH);
+      if(Array.isArray(data.market)){
+        const curM = lsGet(LS.market, []);
+        const mids = new Set(curM.map(m=>m.id));
+        data.market.forEach(m=>{ if(m.id && !mids.has(m.id)) curM.push(m); });
+        lsSet(LS.market, curM);
+        renderMarketList();
+      }
+      if(Array.isArray(data.customDims)){
+        const curD = lsGet(LS.customDims, []);
+        const names = new Set(curD.map(d=>d.name));
+        data.customDims.forEach(d=>{ if(d.name && !names.has(d.name)) curD.push(d); });
+        lsSet(LS.customDims, curD);
+        renderCustomDims();
+      }
       if(data.settings && typeof data.settings==='object'){ lsSet(LS.settings, Object.assign(lsGet(LS.settings, {}), data.settings)); loadSettings(); }
       renderHistory();
       renderHypotheses(window.__lastPerfSnapshot ? window.__lastPerfSnapshot.perfData : null);
@@ -1514,11 +1648,240 @@ document.getElementById('gasSyncBtn').addEventListener('click', async ()=>{
     await fetch(url, {
       method:'POST', mode:'no-cors',
       headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({ type:'materialToolSync', syncedAt:new Date().toISOString(), history: lsGet(LS.history, []), hypotheses: lsGet(LS.hypo, []) })
+      body: JSON.stringify({ type:'materialToolSync', syncedAt:new Date().toISOString(), history: lsGet(LS.history, []), hypotheses: lsGet(LS.hypo, []), market: lsGet(LS.market, []).map(m=>({id:m.id, game:m.game, source:m.source, firstSeen:m.firstSeen, name:m.name, tags:m.tags})) })
     });
     hintEl.textContent = '✓ 已送出同步請求，請到試算表確認資料（no-cors 模式無法讀取回應）';
   }catch(err){ hintEl.textContent = '同步失敗：' + err.message; }
 });
+
+// ── 自訂分析維度 ───────────────────────────────────────
+LS.customDims = 'mt_custom_dims';
+function renderCustomDims(){
+  const list = document.getElementById('cdList');
+  const dims = getCustomDims();
+  list.innerHTML = dims.length
+    ? dims.map((d,i)=>`<span class="featTag" style="margin:0 8px 6px 0;">${esc(d.name)}<span style="color:var(--text-muted);">｜${esc(d.hint||'')}</span> <button type="button" data-i="${i}" class="cdDel" style="border:none; background:transparent; color:var(--coral); cursor:pointer; font-size:12px; padding:0 2px;">✕</button></span>`).join('')
+    : '<span style="font-size:12px; color:var(--text-muted);">尚無自訂維度</span>';
+  list.querySelectorAll('.cdDel').forEach(a=>a.addEventListener('click', e=>{
+    e.preventDefault();
+    const dims2 = getCustomDims();
+    const d = dims2[+a.dataset.i];
+    if(!confirm(`移除自訂維度「${d.name}」？既有標籤資料保留，但不再出現於 Prompt 與對比圖。`)) return;
+    dims2.splice(+a.dataset.i,1); lsSet(LS.customDims, dims2);
+    renderCustomDims(); refreshDimViews();
+  }));
+}
+function refreshDimViews(){
+  if(Object.keys(aiResults).length) renderFeatureCross();
+  renderMarketCompare();
+}
+document.getElementById('cdAddBtn').addEventListener('click', ()=>{
+  const name = document.getElementById('cdName').value.trim();
+  const hint = document.getElementById('cdHint').value.trim();
+  if(!name){ alert('請填維度名稱'); return; }
+  if(name==='檔名' || TAG_FIELDS.some(f=>f[0]===name) || getCustomDims().some(d=>d.name===name)){
+    alert(`「${name}」與既有維度重複`); return;
+  }
+  const dims = getCustomDims();
+  dims.push({name, hint});
+  lsSet(LS.customDims, dims);
+  document.getElementById('cdName').value=''; document.getElementById('cdHint').value='';
+  renderCustomDims(); refreshDimViews();
+});
+
+// ── 市場素材庫（競品對比） ─────────────────────────────
+LS.market = 'mt_market';
+function marketAll(){ return lsGet(LS.market, []); }
+function marketSave(arr){ lsSet(LS.market, arr); }
+function survivalDays(firstSeen){
+  if(!firstSeen) return 1;
+  const ts = new Date(firstSeen).getTime();
+  if(isNaN(ts)) return 1; // 無效日期 → 權重 1，避免 NaN 毒化分佈
+  const d = Math.round((Date.now() - ts)/86400000);
+  return Math.max(1, Math.min(120, d));
+}
+function renderMarketList(){
+  const list = document.getElementById('mkList');
+  const items = marketAll();
+  if(!items.length){ list.innerHTML = '<p class="empty">尚無市場素材。填好遊戲名稱與首見日期後選擇圖片加入。</p>'; return; }
+  const tagged = items.filter(i=>i.tags).length;
+  list.innerHTML = `<p style="font-size:12.5px; color:var(--text-secondary); margin:0 0 6px;">共 ${items.length} 支市場素材，已標籤 ${tagged} 支</p>` +
+    items.map((it,i)=>`
+    <div class="mkItem">
+      <img src="${it.dataUrl}">
+      <div style="flex:1; min-width:0;">
+        <b>${esc(it.game)}</b>　<span class="mkMeta">${esc(it.source)||'-'} · 首見 ${esc(it.firstSeen)||'-'} · 存活 ${survivalDays(it.firstSeen)} 天</span>
+        <div class="mkMeta">${it.tags ? '✓ 已標籤：' + esc([it.tags.訴求類型, it.tags.主色系, it.tags.特效強度].filter(Boolean).join(' · ')) : '待分析'}</div>
+      </div>
+      <button class="ghostBtn" style="height:26px; font-size:11.5px;" onclick="mkDelete(${i})">刪除</button>
+    </div>`).join('');
+  renderMarketCompare();
+}
+window.mkDelete = function(i){
+  const items = marketAll();
+  if(!confirm(`刪除市場素材「${items[i]?.game} #${i+1}」？`)) return;
+  items.splice(i,1); marketSave(items); renderMarketList();
+};
+document.getElementById('mkUploadBtn').addEventListener('click', ()=>{
+  if(!document.getElementById('mkGame').value.trim()){ alert('請先填遊戲名稱'); return; }
+  document.getElementById('mkUploadInput').click();
+});
+document.getElementById('mkUploadInput').addEventListener('change', e=>{
+  const game = document.getElementById('mkGame').value.trim();
+  const source = document.getElementById('mkSource').value.trim();
+  const firstSeen = document.getElementById('mkDate').value;
+  const files = [...e.target.files].filter(f=>f.type.startsWith('image/'));
+  if(!files.length) return;
+  const items = marketAll();
+  let done = 0;
+  files.forEach((f, fi)=>{
+    const reader = new FileReader();
+    reader.onload = ev=>{
+      items.push({ id:'m'+Date.now()+'_'+fi, name:`市場_${game}_${f.name}`, game, source, firstSeen,
+        addedAt: new Date().toISOString().slice(0,10), dataUrl: ev.target.result, tags:null });
+      if(++done === files.length){ marketSave(items); renderMarketList(); }
+    };
+    reader.readAsDataURL(f);
+  });
+  e.target.value='';
+});
+document.getElementById('mkGenPromptBtn').addEventListener('click', ()=>{
+  const pending = marketAll().filter(i=>!i.tags);
+  const target = pending.length ? pending : marketAll();
+  if(!target.length){ alert('請先加入市場素材圖片'); return; }
+  const fileList = target.map(i=>`- ${i.name}（遊戲：${i.game}）`).join('\n');
+  const prompt = `你是遊戲行銷素材分析師。我會上傳 ${target.length} 張「市場上其他遊戲」的廣告素材，檔名如下：
+${fileList}
+
+請針對每一張輸出結構化視覺特徵標籤，欄位格式（檔名須與清單完全一致）：
+${getTagSchema()}
+
+請回傳一個 JSON 物件，格式：{"標籤":[每張各一筆的物件陣列]}，不要其他文字、不要 markdown 標記。`;
+  document.getElementById('mkPromptOutput').value = prompt;
+  document.getElementById('mkPromptWrap').style.display = 'block';
+});
+document.getElementById('mkApplyBtn').addEventListener('click', ()=>{
+  const raw = document.getElementById('mkResultInput').value.trim();
+  const hint = document.getElementById('mkApplyHint');
+  const parsed = parseJsonSafe(raw);
+  let arr = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.標籤) ? parsed.標籤 : null);
+  if(!arr){ hint.textContent = '無法解析 JSON'; hint.style.color='var(--coral)'; return; }
+  const items = marketAll();
+  let matched = 0;
+  arr.forEach(tag=>{
+    if(!tag || !tag.檔名) return;
+    const it = items.find(i=>i.name===tag.檔名 || i.name.endsWith(tag.檔名));
+    if(it){ it.tags = tag; matched++; }
+  });
+  marketSave(items);
+  hint.textContent = `已套用 ${matched}/${arr.length} 筆市場標籤`;
+  hint.style.color = 'var(--text-secondary)';
+  renderMarketList();
+});
+
+// ── Google 表單匯入 ────────────────────────────────────
+// 表單回應 → 試算表 → GAS doGet(action=marketImport) → 此處拉取合併
+document.getElementById('mkFormImportBtn').addEventListener('click', async ()=>{
+  const url = document.getElementById('gasUrlInput').value.trim();
+  const hint = document.getElementById('mkFormHint');
+  if(!url){ hint.textContent = '請先在下方「歷史庫與備份」填入 GAS Web App URL'; return; }
+  saveSettings();
+  hint.textContent = '匯入中…（含圖片，可能需十幾秒）';
+  try{
+    const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'action=marketImport');
+    const data = await res.json();
+    if(!data || !Array.isArray(data.items)) throw new Error(data && data.error ? data.error : '回傳格式不正確');
+    const items = marketAll();
+    const ids = new Set(items.map(i=>i.id));
+    let added = 0, skipped = 0;
+    data.items.forEach(it=>{
+      if(!it.id || ids.has(it.id)){ skipped++; return; }
+      items.push({
+        id: it.id,
+        name: it.name || `市場_${it.game||'未命名'}_${it.id}`,
+        game: it.game || '未命名', source: it.source || 'Google表單',
+        firstSeen: it.firstSeen || '', addedAt: new Date().toISOString().slice(0,10),
+        dataUrl: it.imageBase64 ? `data:${it.mime||'image/jpeg'};base64,${it.imageBase64}` : 'data:,',
+        tags: null
+      });
+      added++;
+    });
+    marketSave(items);
+    renderMarketList();
+    hint.textContent = `✓ 匯入 ${added} 筆（略過重複 ${skipped} 筆）。接著點「產生市場素材分析 Prompt」進行標籤`;
+  }catch(err){
+    hint.textContent = '匯入失敗：' + err.message + '（確認 GAS 已部署最新版、存取權為任何人）';
+  }
+});
+
+// ── 我方 × 市場 特徵分佈對比 ──────────────────────────
+function distShare(records, weightFn){
+  // records: [{tags, w}] → { dim: { value: sharePct } }
+  const out = {};
+  allCrossDims().forEach(dim=>{
+    const g = {}; let tot = 0;
+    records.forEach(r=>{
+      let v = r.tags[dim];
+      if(v==null || v==='') return;
+      v = String(v).replace(/\s*[（(]不確定[)）]\s*/g,'').trim();
+      if(!v) return;
+      const w = r.w;
+      g[v] = (g[v]||0) + w; tot += w;
+    });
+    if(tot>0){ out[dim] = {}; Object.entries(g).forEach(([k,v])=>out[dim][k] = v/tot*100); }
+  });
+  return out;
+}
+function renderMarketCompare(){
+  const wrap = document.getElementById('mvsWrap');
+  const gapsEl = document.getElementById('mvsGaps');
+  const own = uploadedImages.filter(i=>aiResults[i.name]).map(i=>({tags: aiResults[i.name], w:1}));
+  const mkt = marketAll().filter(i=>i.tags).map(i=>({tags: i.tags, w: survivalDays(i.firstSeen)}));
+  if(own.length<3 || mkt.length<3){
+    wrap.innerHTML = `<p class="empty">需要我方 ≥3 支已標籤素材（目前 ${own.length}）＋市場 ≥3 支（目前 ${mkt.length}），對比會自動出現。</p>`;
+    gapsEl.innerHTML=''; return;
+  }
+  const dOwn = distShare(own), dMkt = distShare(mkt);
+  const gaps = [];
+  const cards = allCrossDims().map(dim=>{
+    const o = dOwn[dim]||{}, m = dMkt[dim]||{};
+    const keys = [...new Set([...Object.keys(o), ...Object.keys(m)])];
+    if(keys.length<1) return '';
+    keys.sort((a,b)=>(m[b]||0)-(m[a]||0));
+    const rows = keys.slice(0,5).map(k=>{
+      const op = o[k]||0, mp = m[k]||0, gap = mp-op;
+      if(gap>=15 && mp>=25) gaps.push({dim, key:k, own:op, mkt:mp});
+      return `
+        <div class="mvRow">
+          <div class="mvLabel" title="${esc(k)}">${esc(k)}</div>
+          <div class="mvPair">
+            <div class="mvBarWrap"><div class="mvBar" style="width:${Math.max(1,op).toFixed(0)}%; background:#1d9e75;"></div><span class="mvPct">我方 ${op.toFixed(0)}%</span></div>
+            <div class="mvBarWrap"><div class="mvBar" style="width:${Math.max(1,mp).toFixed(0)}%; background:#5b7bb5;"></div><span class="mvPct">市場 ${mp.toFixed(0)}%</span></div>
+          </div>
+        </div>`;
+    }).join('');
+    return `<div class="fxCard"><div class="fxDim">${esc(dim)}</div>${rows}</div>`;
+  }).filter(Boolean).join('');
+  wrap.innerHTML = `
+    <p style="font-size:12.5px; color:var(--text-secondary); margin:0 0 10px;">我方 ${own.length} 支 vs 市場 ${mkt.length} 支（存活天數加權）　<span style="color:#1d9e75;">■ 我方</span>　<span style="color:#5b7bb5;">■ 市場</span></p>
+    <div class="fxGrid">${cards}</div>`;
+  gapsEl.innerHTML = gaps.length ? `
+    <h3 style="font-size:14px; margin:16px 0 8px;">建議關注的缺口（市場高頻、我方少用）</h3>
+    ${gaps.sort((a,b)=>(b.mkt-b.own)-(a.mkt-a.own)).slice(0,6).map((g,i)=>`
+      <span class="gapChip">${esc(g.dim)}＝${esc(g.key)}：市場 ${g.mkt.toFixed(0)}% vs 我方 ${g.own.toFixed(0)}%
+        <button class="gapBtn" data-key="${esc(g.key)}" data-dim="${esc(g.dim)}">＋轉為假設</button></span>`).join('')}
+    <p class="sub" style="margin:6px 0 0;">市場高頻不代表對我們有效——轉為假設後，由下一波自家投放數據裁決。</p>` : '';
+  gapsEl.querySelectorAll('.gapBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>gapToHypo(btn.dataset.key, btn.dataset.dim));
+  });
+}
+function gapToHypo(key, dim){
+  document.getElementById('hypoDesc').value = `市場高頻特徵驗證：${dim}＝${key} 可提升 CTR`;
+  document.getElementById('hypoKeyword').value = key;
+  const descEl = document.getElementById('hypoDesc');
+  if(descEl.scrollIntoView) descEl.scrollIntoView({behavior:'smooth', block:'center'});
+  alert('已帶入假設欄位。提醒：關鍵字需出現在素材名稱或賣點中才能自動驗證，請視命名習慣調整（例如把「情感懷舊」改為「懷舊」）。');
+};
 
 // ── 週報圖卡匯出 ───────────────────────────────────────
 document.getElementById('exportCardBtn').addEventListener('click', async ()=>{
@@ -1587,6 +1950,8 @@ document.getElementById('exportCardBtn').addEventListener('click', async ()=>{
 loadSettings();
 renderHistory();
 renderHypotheses(null);
+renderMarketList();
+renderCustomDims();
 </script>
 </body>
 </html>

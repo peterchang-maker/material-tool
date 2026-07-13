@@ -1441,7 +1441,7 @@ function renderNameCheck(){
   panel.innerHTML = `
     <div class="checkPanel warn">
       ⚠ 命名檢查：${RAW.length} 筆中有 <b>${bad.length}</b> 筆不符合五段式命名（配對成功率 ${rate}%）。缺漏欄位會導致該素材在切角／賣點／走期分析中被歸入「未分類」，數據將失真。
-      <ul>${items}${bad.length>12?\`<li>…另有 \${bad.length-12} 筆，請於明細表檢視</li>\`:\`\`}</ul>
+      <ul>${items}${bad.length>12?`<li>…另有 ${bad.length-12} 筆，請於明細表檢視</li>`:''}</ul>
     </div>`;
 }
 
@@ -2418,7 +2418,7 @@ document.getElementById('exportCardBtn').addEventListener('click', async ()=>{
     <div style="margin-top:28px; padding-top:16px; border-top:1px solid ${line}; font-size:12px; color:${sub};">天堂M 運營部 · 素材成效分析工具自動產出</div>
   `;
   try{
-    const canvas = await html2canvas(el, {backgroundColor:'#0E1526', scale:2});
+    const canvas = await html2canvas(el, {backgroundColor:'#0E1526', scale:2, useCORS:true, allowTaint:true});
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
     a.download = `素材成效週報_${today}.png`;

@@ -289,7 +289,7 @@
         <div id="apiConfig" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
           <div class="controls" style="margin-bottom:8px;">
             <input type="password" id="apiKeyInput" placeholder="貼上 Google AI Studio 的 API Key" style="flex:1; min-width:260px;">
-            <input id="apiModelInput" placeholder="模型" value="gemini-2.5-flash" style="width:170px;">
+            <input id="apiModelInput" placeholder="模型" value="gemini-3.5-flash" style="width:170px;">
             <button class="ghostBtn" id="apiSaveBtn">儲存</button>
             <button class="ghostBtn" id="apiTestBtn">測試連線</button>
             <button class="ghostBtn" id="apiClearBtn" style="color:var(--coral);">清除</button>
@@ -1441,7 +1441,7 @@ function renderNameCheck(){
   panel.innerHTML = `
     <div class="checkPanel warn">
       ⚠ 命名檢查：${RAW.length} 筆中有 <b>${bad.length}</b> 筆不符合五段式命名（配對成功率 ${rate}%）。缺漏欄位會導致該素材在切角／賣點／走期分析中被歸入「未分類」，數據將失真。
-      <ul>${items}${bad.length>12?`<li>…另有 ${bad.length-12} 筆，請於明細表檢視</li>`:''}</ul>
+      <ul>${items}${bad.length>12?\`<li>…另有 \${bad.length-12} 筆，請於明細表檢視</li>\`:\`\`}</ul>
     </div>`;
 }
 
@@ -1682,22 +1682,90 @@ document.getElementById('importJsonInput').addEventListener('change', e=>{
   reader.readAsText(f);
 });
 
-// ── GAS 雲端同步 ───────────────────────────────────────
+// ── GAS 雲端同步 (v3 SQA 強化版：切塊傳輸 + 狀態去重 + 真實回傳捕捉) ────────────────────────
 document.getElementById('gasSyncBtn').addEventListener('click', async ()=>{
   const url = document.getElementById('gasUrlInput').value.trim();
   const hintEl = document.getElementById('gasSyncHint');
-  if(!url){ hintEl.textContent = '請先貼上 GAS Web App URL（部署方式見說明書）'; return; }
+  if(!url){ hintEl.textContent = '請先貼上 GAS Web App URL'; return; }
   saveSettings();
-  hintEl.textContent = '同步中…';
-  try{
-    // GAS Web App 標準模式：POST text/plain 避免 CORS preflight
-    await fetch(url, {
-      method:'POST', mode:'no-cors',
-      headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({ type:'materialToolSync', syncedAt:new Date().toISOString(), history: lsGet(LS.history, []), hypotheses: lsGet(LS.hypo, []), market: lsGet(LS.market, []).map(m=>({id:m.id, game:m.game, source:m.source, firstSeen:m.firstSeen, name:m.name, tags:m.tags})) })
-    });
-    hintEl.textContent = '✓ 已送出同步請求，請到試算表確認資料（no-cors 模式無法讀取回應）';
-  }catch(err){ hintEl.textContent = '同步失敗：' + err.message; }
+  
+  // 1. 過濾出「尚未同步」的新資料，避免重複上傳與重複寫入
+  const newOurMats = uploadedImages.filter(img => !img.synced).map(img => ({
+    name: img.name, base64: img.dataUrl,
+    angle: img.matchedRow ? img.matchedRow.素材切角 : '',
+    sellingPoint: img.matchedRow ? img.matchedRow.賣點 : '',
+    tags: aiResults[img.name] || null
+  }));
+
+  const marketItems = lsGet(LS.market, []);
+  const newMktMats = marketItems.filter(m => !m.synced).map(m => ({
+    id: m.id, game: m.game, source: m.source, firstSeen: m.firstSeen, name: m.name, tags: m.tags, base64: m.dataUrl
+  }));
+
+  const histItems = lsGet(LS.history, []);
+  const newHistory = histItems.filter(h => !h.synced);
+  
+  const hypoItems = lsGet(LS.hypo, []);
+
+  if (!newOurMats.length && !newMktMats.length && !newHistory.length) {
+    hintEl.textContent = '✓ 目前沒有新的資料或圖片需要同步。';
+    return;
+  }
+
+  // 2. 切塊傳輸設定 (Chunking)
+  const BATCH_SIZE = 4; // 每次最多傳 4 張圖，避免 GAS Payload 限制崩潰
+  const combinedImages = [...newOurMats, ...newMktMats];
+  const totalBatches = Math.max(1, Math.ceil(combinedImages.length / BATCH_SIZE));
+  
+  try {
+    for (let i = 0; i < totalBatches; i++) {
+      hintEl.textContent = `打包資料上傳中... (批次 ${i+1}/${totalBatches}) 請勿關閉網頁...`;
+      
+      const chunk = combinedImages.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
+      const payload = {
+        type: 'materialToolSync',
+        syncedAt: new Date().toISOString(),
+        ourMaterials: chunk.filter(c => !c.id), // 沒有 id 的是我方素材
+        market: chunk.filter(c => c.id),        // 有 id 的是市場素材
+        newHistory: (i === 0) ? newHistory.map(h => {
+           return h.rows ? h.rows.map(r => Object.assign({}, r, { label: h.label })) : [];
+        }).flat() : [], 
+        hypotheses: (i === 0) ? hypoItems : []
+      };
+
+      // 移除 no-cors，改為一般請求以捕捉真實 HTTP 狀態
+      const res = await fetch(url, {
+        method: 'POST', 
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      
+      const resText = await res.text();
+      let resJson;
+      try { resJson = JSON.parse(resText); } catch(e) { throw new Error("伺服器回應異常: " + resText.slice(0,50)); }
+      if (resJson.status === "Error") throw new Error(resJson.message);
+
+      // 標記已同步，避免未來重複發送
+      chunk.forEach(c => {
+        if (c.id) {
+          const m = marketItems.find(x => x.id === c.id);
+          if (m) m.synced = true;
+        } else {
+          const m = uploadedImages.find(x => x.name === c.name);
+          if (m) m.synced = true;
+        }
+      });
+    }
+
+    // 標記歷史記錄已同步
+    newHistory.forEach(h => h.synced = true);
+    lsSet(LS.history, histItems);
+    lsSet(LS.market, marketItems); 
+
+    hintEl.textContent = '✓ 已完成全部資料與圖片同步！';
+  } catch(err) { 
+    hintEl.textContent = '✗ 同步失敗：' + err.message; 
+  }
 });
 
 // ══════════════════════════════════════════════════════════
@@ -1709,7 +1777,7 @@ LS.apiModel = 'mt_api_model';
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
 const sleep = ms => new Promise(r=>setTimeout(r, ms));
 function getApiKey(){ return String(lsGet(LS.apiKey, '') || '').trim(); }
-function getApiModel(){ return String(lsGet(LS.apiModel, '') || '').trim() || 'gemini-2.5-flash'; }
+function getApiModel(){ return String(lsGet(LS.apiModel, '') || '').trim() || 'gemini-3.5-flash'; }
 function hasApi(){ return !!getApiKey(); }
 
 function refreshApiUI(){
@@ -1737,7 +1805,7 @@ document.getElementById('apiToggleBtn').addEventListener('click', ()=>{
 });
 document.getElementById('apiSaveBtn').addEventListener('click', ()=>{
   const key = document.getElementById('apiKeyInput').value.trim();
-  const model = document.getElementById('apiModelInput').value.trim() || 'gemini-2.5-flash';
+  const model = document.getElementById('apiModelInput').value.trim() || 'gemini-3.5-flash';
   lsSet(LS.apiKey, key); lsSet(LS.apiModel, model);
   document.getElementById('apiHint').textContent = key ? '✓ 已儲存（僅存於本機瀏覽器）' : '已清空 Key';
   refreshApiUI();
@@ -1751,7 +1819,7 @@ document.getElementById('apiClearBtn').addEventListener('click', ()=>{
 document.getElementById('apiTestBtn').addEventListener('click', async ()=>{
   const hint = document.getElementById('apiHint');
   const key = document.getElementById('apiKeyInput').value.trim();
-  const model = document.getElementById('apiModelInput').value.trim() || 'gemini-2.5-flash';
+  const model = document.getElementById('apiModelInput').value.trim() || 'gemini-3.5-flash';
   if(!key){ hint.textContent = '請先填入 API Key'; return; }
   lsSet(LS.apiKey, key); lsSet(LS.apiModel, model);
   hint.textContent = '測試中…';

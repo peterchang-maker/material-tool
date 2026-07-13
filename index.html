@@ -120,6 +120,16 @@
   .histItem .meta{color:var(--text-muted); font-size:11.5px;}
   .histItem button{height:26px; font-size:11.5px; padding:0 10px;}
   /* 特徵交叉驗證與素材對比 */
+  .apiPanel{border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:14px; background:linear-gradient(180deg, #f7fbf9, var(--surface));}
+  .apiBadge{display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; margin-left:6px; vertical-align:1px;}
+  .apiBadge.off{background:#eeece6; color:var(--text-muted);}
+  .apiBadge.on{background:var(--teal-bg); color:var(--teal);}
+  .progTrack{height:8px; background:#eceae4; border-radius:4px; overflow:hidden; margin-bottom:6px;}
+  .progBar{height:8px; width:0%; background:var(--teal); border-radius:4px; transition:width .3s;}
+  .sugChip{display:inline-flex; align-items:center; gap:8px; border:1px solid var(--teal); background:var(--teal-bg); border-radius:8px; padding:6px 10px; font-size:12px; color:var(--teal); margin:0 8px 8px 0;}
+  .sugChip button{height:24px; font-size:11px; padding:0 8px; border:1px solid var(--teal); border-radius:6px; background:transparent; color:var(--teal); cursor:pointer;}
+  .reportBox{border:1px solid var(--border); border-radius:10px; padding:14px 16px; background:var(--surface);}
+  .reportBox textarea{width:100%; height:190px; border:1px solid var(--border-strong); border-radius:8px; padding:10px; font-size:13px; line-height:1.7; resize:vertical; font-family:inherit;}
   .mkItem{display:flex; gap:12px; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:12.5px;}
   .mkItem img{width:56px; height:56px; object-fit:cover; border-radius:8px; flex-shrink:0;}
   .mkMeta{color:var(--text-muted); font-size:11.5px;}
@@ -184,12 +194,15 @@
   <div id="dashboard">
     <div class="cards" id="summaryCards"></div>
 
+    <div id="aiReportWrap" style="display:none; margin-bottom:18px;"></div>
+
     <div class="toolbar">
       <label>低樣本警示門檻（曝光）：</label>
       <input type="number" id="imprThresholdInput" min="0" step="500" value="3000">
       <div class="sep"></div>
       <button class="ghostBtn" id="saveHistoryBtn">儲存本次分析到歷史庫</button>
       <button class="ghostBtn" id="exportCardBtn">匯出週報圖卡（PNG）</button>
+      <button class="ghostBtn" id="aiReportBtn" style="display:none;">⚡ AI 撰寫週報文字</button>
     </div>
 
     <div class="sheetRow" style="margin-bottom:8px;">
@@ -267,18 +280,43 @@
 
       <div class="imgGrid" id="imgGrid"></div>
 
+      <div class="apiPanel" id="apiPanel">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <p style="font-size:13px; font-weight:600; margin:0;">⚡ Gemini API 直連 <span id="apiStatus" class="apiBadge off">未設定</span></p>
+          <button class="ghostBtn" id="apiToggleBtn" style="height:28px; font-size:12px;">設定 API Key</button>
+        </div>
+        <p class="sub" style="margin:6px 0 0; font-size:12px;">設定後可一鍵自動分析，免去複製 Prompt 與貼回的往返。Key 只存在這台瀏覽器（localStorage），不會上傳到任何地方。</p>
+        <div id="apiConfig" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+          <div class="controls" style="margin-bottom:8px;">
+            <input type="password" id="apiKeyInput" placeholder="貼上 Google AI Studio 的 API Key" style="flex:1; min-width:260px;">
+            <input id="apiModelInput" placeholder="模型" value="gemini-2.5-flash" style="width:170px;">
+            <button class="ghostBtn" id="apiSaveBtn">儲存</button>
+            <button class="ghostBtn" id="apiTestBtn">測試連線</button>
+            <button class="ghostBtn" id="apiClearBtn" style="color:var(--coral);">清除</button>
+          </div>
+          <span class="progressText" id="apiHint" style="margin-top:0;"></span>
+        </div>
+      </div>
+
       <div style="border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:14px; background:var(--surface);">
         <p style="font-size:13px; font-weight:600; margin:0 0 8px;">自訂分析維度 <span style="font-weight:400; color:var(--text-muted); font-size:12px;">預設 18 維之外，可依本次分析需求加入新維度（會自動加入 Prompt 與所有對比圖）</span></p>
         <div class="controls" style="margin-bottom:8px;">
           <input id="cdName" placeholder="維度名稱，例：季節氛圍" style="width:170px;">
           <input id="cdHint" placeholder="選項提示，例：春節或夏日或萬聖節或無" style="flex:1; min-width:220px;">
           <button class="ghostBtn" id="cdAddBtn">新增維度</button>
+          <button class="ghostBtn" id="cdSuggestBtn" style="display:none;">⚡ AI 提議維度</button>
         </div>
+        <div id="cdSuggestWrap" style="margin-bottom:8px;"></div>
         <div id="cdList"></div>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-        <button class="primaryBtn" id="genPromptBtn" disabled>步驟1：產生分析 Prompt（標籤＋洞察一次完成）</button>
+        <button class="primaryBtn" id="autoAnalyzeBtn" disabled style="display:none;">⚡ 一鍵 AI 分析（自動標籤＋洞察）</button>
+        <button class="ghostBtn" id="genPromptBtn" disabled>手動：產生分析 Prompt</button>
         <span class="progressText" id="genPromptHint"></span>
+      </div>
+      <div id="autoProgress" style="display:none; margin-top:10px;">
+        <div class="progTrack"><div class="progBar" id="autoProgBar"></div></div>
+        <span class="progressText" id="autoProgText"></span>
       </div>
 
       <div id="promptWrap" style="display:none; margin-top:14px;">
@@ -342,12 +380,19 @@
         <button class="ghostBtn" id="mkUploadBtn">選擇圖片加入</button>
         <input type="file" id="mkUploadInput" accept="image/*" multiple style="display:none;">
         <button class="ghostBtn" id="mkFormImportBtn">從 Google 表單匯入</button>
+        <button class="ghostBtn" id="mkJsonImportBtn">匯入擷取檔（JSON）</button>
+        <input type="file" id="mkJsonImportInput" accept=".json" style="display:none;">
         <span class="progressText" id="mkFormHint" style="margin-top:0;"></span>
       </div>
       <div id="mkList"><p class="empty">尚無市場素材。填好遊戲名稱與首見日期後選擇圖片加入。</p></div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
-        <button class="primaryBtn" id="mkGenPromptBtn" style="height:34px; font-size:13px;">產生市場素材分析 Prompt</button>
+        <button class="primaryBtn" id="mkAutoTagBtn" style="height:34px; font-size:13px; display:none;">⚡ 一鍵標籤市場素材</button>
+        <button class="ghostBtn" id="mkGenPromptBtn" style="height:34px; font-size:13px;">手動：產生市場素材 Prompt</button>
         <button class="ghostBtn" id="mkClearTaggedBtn" style="display:none;"></button>
+      </div>
+      <div id="mkAutoProgress" style="display:none; margin-top:10px;">
+        <div class="progTrack"><div class="progBar" id="mkProgBar"></div></div>
+        <span class="progressText" id="mkProgText"></span>
       </div>
       <div id="mkPromptWrap" style="display:none; margin-top:12px;">
         <textarea id="mkPromptOutput" readonly style="width:100%; height:110px; font-family:var(--font-mono,monospace); font-size:11.5px; border:1px solid var(--border-strong); border-radius:8px; padding:10px;"></textarea>
@@ -986,6 +1031,7 @@ function renderImgGrid(){
     </div>
   `).join('');
   genPromptBtn.disabled = uploadedImages.length===0;
+  if(typeof refreshApiUI==='function') refreshApiUI();
 }
 
 function parseJsonSafe(text){
@@ -1654,6 +1700,334 @@ document.getElementById('gasSyncBtn').addEventListener('click', async ()=>{
   }catch(err){ hintEl.textContent = '同步失敗：' + err.message; }
 });
 
+// ══════════════════════════════════════════════════════════
+// Gemini API 直連（自動標籤 / 洞察 / 維度提議 / 週報撰寫）
+// Key 僅存於本機 localStorage；手動貼上流程完整保留為後備
+// ══════════════════════════════════════════════════════════
+LS.apiKey = 'mt_api_key';
+LS.apiModel = 'mt_api_model';
+const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
+const sleep = ms => new Promise(r=>setTimeout(r, ms));
+function getApiKey(){ return String(lsGet(LS.apiKey, '') || '').trim(); }
+function getApiModel(){ return String(lsGet(LS.apiModel, '') || '').trim() || 'gemini-2.5-flash'; }
+function hasApi(){ return !!getApiKey(); }
+
+function refreshApiUI(){
+  const on = hasApi();
+  const badge = document.getElementById('apiStatus');
+  badge.textContent = on ? `已啟用（${getApiModel()}）` : '未設定';
+  badge.className = 'apiBadge ' + (on ? 'on' : 'off');
+  ['autoAnalyzeBtn','mkAutoTagBtn','cdSuggestBtn','aiReportBtn'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.style.display = on ? '' : 'none';
+  });
+  const gp = document.getElementById('genPromptBtn');
+  if(gp) gp.textContent = on ? '手動：產生分析 Prompt' : '步驟1：產生分析 Prompt（標籤＋洞察一次完成）';
+  const aa = document.getElementById('autoAnalyzeBtn');
+  if(aa) aa.disabled = uploadedImages.length === 0;
+}
+document.getElementById('apiToggleBtn').addEventListener('click', ()=>{
+  const box = document.getElementById('apiConfig');
+  const open = box.style.display === 'none';
+  box.style.display = open ? 'block' : 'none';
+  if(open){
+    document.getElementById('apiKeyInput').value = getApiKey();
+    document.getElementById('apiModelInput').value = getApiModel();
+  }
+});
+document.getElementById('apiSaveBtn').addEventListener('click', ()=>{
+  const key = document.getElementById('apiKeyInput').value.trim();
+  const model = document.getElementById('apiModelInput').value.trim() || 'gemini-2.5-flash';
+  lsSet(LS.apiKey, key); lsSet(LS.apiModel, model);
+  document.getElementById('apiHint').textContent = key ? '✓ 已儲存（僅存於本機瀏覽器）' : '已清空 Key';
+  refreshApiUI();
+});
+document.getElementById('apiClearBtn').addEventListener('click', ()=>{
+  if(!confirm('清除已儲存的 API Key？')) return;
+  lsSet(LS.apiKey, ''); document.getElementById('apiKeyInput').value = '';
+  document.getElementById('apiHint').textContent = '已清除，將回到手動貼上流程';
+  refreshApiUI();
+});
+document.getElementById('apiTestBtn').addEventListener('click', async ()=>{
+  const hint = document.getElementById('apiHint');
+  const key = document.getElementById('apiKeyInput').value.trim();
+  const model = document.getElementById('apiModelInput').value.trim() || 'gemini-2.5-flash';
+  if(!key){ hint.textContent = '請先填入 API Key'; return; }
+  lsSet(LS.apiKey, key); lsSet(LS.apiModel, model);
+  hint.textContent = '測試中…';
+  try{
+    const txt = await callGemini([{ text: '回傳 JSON：{"ok":true}' }], { retries: 1 });
+    const p = parseJsonSafe(txt);
+    hint.textContent = p ? `✓ 連線成功（${model}）` : '⚠ 連線成功但回應格式異常';
+    refreshApiUI();
+  }catch(e){ hint.textContent = '✗ 連線失敗：' + e.message; }
+});
+
+async function callGemini(parts, opts){
+  opts = opts || {};
+  const json = opts.json !== false;
+  const retries = opts.retries || 3;
+  const timeoutMs = opts.timeoutMs || 90000; // 圖片批次較慢，給 90 秒
+  const key = getApiKey();
+  if(!key) throw new Error('尚未設定 API Key');
+  const model = getApiModel();
+  const gc = { temperature: 0.2 };
+  if(json) gc.responseMimeType = 'application/json';
+  const body = { contents: [{ role: 'user', parts }], generationConfig: gc };
+  let lastErr;
+  for(let i = 0; i < retries; i++){
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(()=>ctrl.abort(), timeoutMs) : null;
+    try{
+      const res = await fetch(`${API_BASE}${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        signal: ctrl ? ctrl.signal : undefined
+      });
+      if(timer) clearTimeout(timer);
+      if(res.status === 429 || res.status === 503){
+        lastErr = new Error(res.status === 429 ? '已達免費額度速率上限' : '模型忙碌中');
+        if(i < retries - 1){ await sleep(2000 * (i + 1)); continue; }
+        throw lastErr;
+      }
+      const data = await res.json();
+      if(!res.ok){
+        const msg = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+        // 4xx 屬用戶端錯誤（金鑰無效、參數錯誤、模型不存在），重試也不會成功 → 立即回報
+        if(res.status >= 400 && res.status < 500) throw Object.assign(new Error(msg), { fatal: true });
+        throw new Error(msg);
+      }
+      const cand = data.candidates && data.candidates[0];
+      if(!cand) throw new Error('回應為空（可能被安全機制過濾）');
+      const text = ((cand.content && cand.content.parts) || []).map(p=>p.text || '').join('');
+      if(!text) throw new Error('回應無文字內容');
+      return text;
+    }catch(e){
+      if(timer) clearTimeout(timer);
+      lastErr = (e && e.name === 'AbortError')
+        ? new Error(`請求逾時（超過 ${Math.round(timeoutMs/1000)} 秒），可能是網路不穩或圖片過大`)
+        : e;
+      if(e && e.fatal) throw e;
+      if(i === retries - 1) throw lastErr;
+      await sleep(1200 * (i + 1));
+    }
+  }
+  throw lastErr;
+}
+function imgPart(dataUrl){
+  const m = /^data:(image\/[a-zA-Z+]+);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl || '');
+  return m ? { inline_data: { mime_type: m[1], data: m[2] } } : null;
+}
+function setProg(barId, textId, wrapId, done, total, label){
+  document.getElementById(wrapId).style.display = total ? 'block' : 'none';
+  document.getElementById(barId).style.width = total ? Math.round(done / total * 100) + '%' : '0%';
+  document.getElementById(textId).textContent = label || `分析中… ${done}/${total}`;
+}
+
+// ── 批次自動標籤（我方／市場共用）──────────────────────
+async function autoTagImages(images, onProgress, isMarket){
+  const BATCH = 6;
+  const out = {};
+  let done = 0;
+  for(let i = 0; i < images.length; i += BATCH){
+    if(i > 0) await sleep(1500); // 批次間節流：免費額度有每分鐘請求上限，避免觸發 429
+    const chunk = images.slice(i, i + BATCH);
+    const head = isMarket
+      ? `你是遊戲行銷素材分析師。以下是「市場上其他遊戲」的廣告素材，請為每一張輸出視覺特徵標籤。`
+      : `你是遊戲行銷素材分析師。以下是我方遊戲的廣告素材，請為每一張輸出視覺特徵標籤。`;
+    const parts = [{ text: `${head}
+
+每張圖片前會先給一行【檔名】，回傳時「檔名」欄位必須與之完全一致。
+欄位格式如下：
+${getTagSchema()}
+
+判斷依據：
+- 「訴求類型」：主打折扣/贈品=促銷優惠；喚起回憶/情懷=情感懷舊；展示強度/裝備/戰力=實力展示；解說玩法/版本內容=內容資訊；賣關子=懸念好奇。
+- 「遊戲畫面展示」：出現真實遊戲UI（血條/技能欄/小地圖）=實機介面；僅宣傳美術=純美術；兩者皆有=混合。
+- 「懷舊元素」：出現經典舊版畫面、像素風、「當年/回憶」等語彙即為「有」。
+- 「人物類型」若無法確定，選最接近的並在後面加註「(不確定)」。
+
+請只回傳 JSON 物件：{"標籤":[每張圖片各一筆，依我提供的順序]}，不要任何其他文字。` }];
+    chunk.forEach(img=>{
+      const p = imgPart(img.dataUrl);
+      parts.push({ text: `【檔名】${img.name}` });
+      if(p) parts.push(p);
+    });
+    const txt = await callGemini(parts);
+    const parsed = parseJsonSafe(txt);
+    let arr = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.標籤) ? parsed.標籤 : []);
+    arr.forEach((tag, idx)=>{
+      if(!tag || typeof tag !== 'object') return;
+      // 檔名對不上時以順序回填（模型偶爾會改寫檔名）
+      let name = tag.檔名;
+      if(!name || !chunk.some(c=>c.name === name)) name = chunk[idx] ? chunk[idx].name : null;
+      if(name){ tag.檔名 = name; out[name] = tag; }
+    });
+    done += chunk.length;
+    if(onProgress) onProgress(done, images.length);
+  }
+  return out;
+}
+
+// ── 一鍵 AI 分析（我方：標籤＋洞察）──────────────────────
+document.getElementById('autoAnalyzeBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('autoAnalyzeBtn');
+  const targets = uploadedImages.filter(i=>imgPart(i.dataUrl));
+  if(!targets.length){ alert('沒有可分析的圖片'); return; }
+  btn.disabled = true;
+  const t0 = Date.now();
+  try{
+    setProg('autoProgBar', 'autoProgText', 'autoProgress', 0, targets.length, `準備分析 ${targets.length} 張素材…`);
+    const tags = await autoTagImages(targets, (d, t)=>setProg('autoProgBar', 'autoProgText', 'autoProgress', d, t), false);
+    Object.assign(aiResults, tags);
+    renderAiTable();
+    setProg('autoProgBar', 'autoProgText', 'autoProgress', targets.length, targets.length, '標籤完成，正在產生洞察…');
+    // 洞察：把特徵與實際成效一起交給模型
+    const lines = targets.filter(i=>i.matchedRow && aiResults[i.name]).map(i=>{
+      const r = i.matchedRow, t = aiResults[i.name];
+      const feat = Object.entries(t).filter(([k])=>k !== '檔名').map(([k, v])=>`${k}:${v}`).join('、');
+      return `- ${i.name}｜CTR ${r.CTR != null ? (r.CTR * 100).toFixed(2) + '%' : '-'}｜曝光 ${r.曝光 || 0}｜特徵：${feat}`;
+    }).join('\n');
+    if(lines){
+      const txt = await callGemini([{ text: `以下是遊戲行銷素材的視覺特徵與實際投放成效：
+${lines}
+
+請用繁體中文寫出 3–4 點洞察：哪些視覺特徵與高／低 CTR 相關，並給出下次製作素材的具體行動建議。
+注意：曝光量過低的素材數據僅供參考，請勿過度解讀。
+只回傳 JSON：{"洞察":"條列文字，換行用\\n"}` }]);
+      const p = parseJsonSafe(txt);
+      const insight = p && typeof p.洞察 === 'string' ? p.洞察.trim() : null;
+      if(insight){
+        lastAiSummary = insight;
+        document.getElementById('aiSummaryWrap').innerHTML = `<div class="aiSummary">${esc(insight)}</div>`;
+      }
+    }
+    const secs = ((Date.now() - t0) / 1000).toFixed(0);
+    setProg('autoProgBar', 'autoProgText', 'autoProgress', targets.length, targets.length,
+      `✓ 完成：${Object.keys(tags).length}/${targets.length} 張已標籤，洞察已產生（耗時 ${secs} 秒）`);
+  }catch(e){
+    setProg('autoProgBar', 'autoProgText', 'autoProgress', 0, 1, '✗ 失敗：' + e.message + '（可改用下方手動流程）');
+  }finally{ btn.disabled = false; }
+});
+
+// ── 一鍵標籤市場素材 ───────────────────────────────────
+document.getElementById('mkAutoTagBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('mkAutoTagBtn');
+  const pending = marketAll().filter(i=>!i.tags && imgPart(i.dataUrl));
+  if(!pending.length){ alert('沒有待標籤的市場素材（僅連結、無圖片內容者無法自動分析）'); return; }
+  btn.disabled = true;
+  try{
+    setProg('mkProgBar', 'mkProgText', 'mkAutoProgress', 0, pending.length, `準備分析 ${pending.length} 張市場素材…`);
+    const tags = await autoTagImages(pending, (d, t)=>setProg('mkProgBar', 'mkProgText', 'mkAutoProgress', d, t), true);
+    const items = marketAll();
+    let n = 0;
+    items.forEach(it=>{ if(tags[it.name]){ it.tags = tags[it.name]; n++; } });
+    marketSave(items);
+    renderMarketList();
+    setProg('mkProgBar', 'mkProgText', 'mkAutoProgress', pending.length, pending.length, `✓ 完成：${n} 支市場素材已標籤`);
+  }catch(e){
+    setProg('mkProgBar', 'mkProgText', 'mkAutoProgress', 0, 1, '✗ 失敗：' + e.message + '（可改用手動流程）');
+  }finally{ btn.disabled = false; }
+});
+
+// ── AI 提議新分析維度 ──────────────────────────────────
+document.getElementById('cdSuggestBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('cdSuggestBtn');
+  const wrap = document.getElementById('cdSuggestWrap');
+  const samples = uploadedImages.filter(i=>imgPart(i.dataUrl)).slice(0, 4);
+  btn.disabled = true;
+  wrap.innerHTML = '<span class="progressText">AI 思考中…</span>';
+  try{
+    const existing = allCrossDims().join('、');
+    const parts = [{ text: `你是遊戲行銷素材分析師。我們目前分析素材時已使用這些維度：
+${existing}
+
+${samples.length ? '以下附上幾張我們實際投放的素材圖片作為參考。' : ''}
+請提議 3 個「目前沒有、但對手遊廣告成效分析有價值」的新分析維度。每個維度要能用少數幾個離散選項描述（方便統計占比）。
+
+只回傳 JSON：{"維度":[{"name":"維度名稱(20字內)","hint":"選項A或選項B或選項C","why":"一句話說明為何值得追蹤(30字內)"}]}` }];
+    samples.forEach(img=>{ const p = imgPart(img.dataUrl); if(p) parts.push(p); });
+    const txt = await callGemini(parts);
+    const p = parseJsonSafe(txt);
+    const dims = (p && Array.isArray(p.維度) ? p.維度 : []).filter(d=>d && d.name);
+    if(!dims.length){ wrap.innerHTML = '<span class="progressText">AI 沒有提出有效建議，請再試一次</span>'; return; }
+    window.__sugDims = dims;
+    wrap.innerHTML = dims.map((d, i)=>{
+      const dup = allCrossDims().includes(d.name);
+      return `<span class="sugChip"><b>${esc(d.name)}</b>｜${esc(d.hint || '')}${d.why ? `　<span style="color:var(--text-muted);">${esc(d.why)}</span>` : ''}
+        ${dup ? '<span style="color:var(--text-muted);">已存在</span>' : `<button class="sugAdd" data-i="${i}">＋加入</button>`}</span>`;
+    }).join('');
+    wrap.querySelectorAll('.sugAdd').forEach(b=>b.addEventListener('click', ()=>{
+      const d = window.__sugDims[+b.dataset.i];
+      if(!d) return;
+      const name = String(d.name).replace(/["\\\n\r]/g, '').slice(0, 20);
+      const hint = String(d.hint || '').replace(/["\\\n\r]/g, '').slice(0, 80);
+      if(allCrossDims().includes(name)){ alert('此維度已存在'); return; }
+      const dims2 = getCustomDims();
+      dims2.push({ name, hint });
+      lsSet(LS.customDims, dims2);
+      renderCustomDims(); refreshDimViews();
+      b.outerHTML = '<span style="color:var(--teal);">✓ 已加入</span>';
+    }));
+  }catch(e){
+    wrap.innerHTML = `<span class="progressText" style="color:var(--coral);">✗ ${esc(e.message)}</span>`;
+  }finally{ btn.disabled = false; }
+});
+
+// ── AI 撰寫週報文字 ────────────────────────────────────
+document.getElementById('aiReportBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('aiReportBtn');
+  const snap = window.__lastPerfSnapshot;
+  if(!snap){ alert('請先上傳並解析資料'); return; }
+  const wrap = document.getElementById('aiReportWrap');
+  btn.disabled = true;
+  wrap.style.display = 'block';
+  wrap.innerHTML = '<div class="reportBox"><span class="progressText">AI 撰寫中…</span></div>';
+  try{
+    const { avgCTR, totalCost, angleWithScore, spAgg, ctxLabel } = snap;
+    const angles = angleWithScore.map(a=>`${a.key}：CTR ${(a.ctr * 100).toFixed(2)}%、CPA ${a.cpa != null ? a.cpa.toFixed(2) : '-'}`).join('；');
+    const tops = spAgg.slice(0, 5).map(s=>`${s.key} ${(s.ctr * 100).toFixed(2)}%`).join('、');
+    const hypos = lsGet(LS.hypo, []).map(h=>{
+      const last = (h.history || []).slice(-1)[0];
+      return `${h.desc}（關鍵字 ${h.keyword}${last ? `，最近差異 ${last.lift >= 0 ? '+' : ''}${last.lift.toFixed(1)}%` : ''}）`;
+    }).join('；');
+    const txt = await callGemini([{ text: `你是遊戲營運行銷分析師，請撰寫一份給主管的素材成效週報（繁體中文）。
+
+【本期數據】情境：${ctxLabel}
+整體加權 CTR：${(avgCTR * 100).toFixed(2)}%，總花費：$${Math.round(totalCost).toLocaleString()}
+各切角：${angles}
+賣點 TOP5：${tops}
+${lastAiSummary ? `AI 視覺洞察：${lastAiSummary}` : ''}
+${hypos ? `追蹤中的假設：${hypos}` : ''}
+
+請用以下結構撰寫，語氣專業精簡、可直接貼進週報，不要客套話：
+一、本期重點（2–3 句話總結）
+二、成效觀察（3 點，每點含具體數字）
+三、下期行動建議（3 點，具體可執行）
+
+只回傳 JSON：{"報告":"完整報告文字，換行用\\n"}` }]);
+    const p = parseJsonSafe(txt);
+    const report = p && typeof p.報告 === 'string' ? p.報告.trim() : null;
+    if(!report) throw new Error('回應格式異常');
+    wrap.innerHTML = `
+      <div class="reportBox">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <b style="font-size:14px;">AI 週報草稿</b>
+          <button class="ghostBtn" id="copyReportBtn" style="height:28px; font-size:12px;">複製全文</button>
+        </div>
+        <textarea id="aiReportText"></textarea>
+      </div>`;
+    document.getElementById('aiReportText').value = report;
+    document.getElementById('copyReportBtn').addEventListener('click', ()=>{
+      const ta = document.getElementById('aiReportText');
+      ta.select();
+      navigator.clipboard ? navigator.clipboard.writeText(ta.value) : document.execCommand('copy');
+      document.getElementById('copyReportBtn').textContent = '✓ 已複製';
+    });
+  }catch(e){
+    wrap.innerHTML = `<div class="reportBox"><span class="progressText" style="color:var(--coral);">✗ 撰寫失敗：${esc(e.message)}</span></div>`;
+  }finally{ btn.disabled = false; }
+});
+
 // ── 自訂分析維度 ───────────────────────────────────────
 LS.customDims = 'mt_custom_dims';
 function renderCustomDims(){
@@ -1679,6 +2053,12 @@ document.getElementById('cdAddBtn').addEventListener('click', ()=>{
   const name = document.getElementById('cdName').value.trim();
   const hint = document.getElementById('cdHint').value.trim();
   if(!name){ alert('請填維度名稱'); return; }
+  if(/["\\\n\r]/.test(name) || /["\\\n\r]/.test(hint)){
+    alert('維度名稱與選項提示不可包含雙引號、反斜線或換行（會破壞 Prompt 的 JSON 格式）'); return;
+  }
+  if(name.length > 20 || hint.length > 80){
+    alert('維度名稱請在 20 字內、選項提示在 80 字內'); return;
+  }
   if(name==='檔名' || TAG_FIELDS.some(f=>f[0]===name) || getCustomDims().some(d=>d.name===name)){
     alert(`「${name}」與既有維度重複`); return;
   }
@@ -1700,6 +2080,32 @@ function survivalDays(firstSeen){
   const d = Math.round((Date.now() - ts)/86400000);
   return Math.max(1, Math.min(120, d));
 }
+// 外部項目合併收口：所有來源（表單 / 擷取檔）共用同一淨化與去重
+function mergeMarketItems(rawItems, defaultSource){
+  const items = marketAll();
+  const ids = new Set(items.map(i=>i.id));
+  let added = 0, skipped = 0;
+  (rawItems||[]).forEach(it=>{
+    if(!it || !it.id || ids.has(String(it.id))){ skipped++; return; }
+    const b64 = String(it.imageBase64||'').replace(/[^A-Za-z0-9+/=]/g,'');
+    const mime = /^image\/(jpeg|png|gif|webp)$/.test(String(it.mime)) ? it.mime : 'image/jpeg';
+    items.push({
+      id: String(it.id),
+      name: it.name || `市場_${it.game||'未命名'}_${it.id}`,
+      game: it.game || '未命名', source: it.source || defaultSource,
+      firstSeen: it.firstSeen || '', addedAt: new Date().toISOString().slice(0,10),
+      dataUrl: b64 ? `data:${mime};base64,${b64}` : 'data:,',
+      imageUrl: (typeof it.imageUrl==='string' && /^https:\/\//.test(it.imageUrl)) ? it.imageUrl : null,
+      tags: null
+    });
+    ids.add(String(it.id));
+    added++;
+  });
+  marketSave(items);
+  renderMarketList();
+  return { added, skipped };
+}
+
 function renderMarketList(){
   const list = document.getElementById('mkList');
   const items = marketAll();
@@ -1708,7 +2114,7 @@ function renderMarketList(){
   list.innerHTML = `<p style="font-size:12.5px; color:var(--text-secondary); margin:0 0 6px;">共 ${items.length} 支市場素材，已標籤 ${tagged} 支</p>` +
     items.map((it,i)=>`
     <div class="mkItem">
-      <img src="${it.dataUrl}">
+      <img src="${it.dataUrl && it.dataUrl!=='data:,' ? it.dataUrl : (it.imageUrl ? esc(it.imageUrl) : 'data:,')}" referrerpolicy="no-referrer">
       <div style="flex:1; min-width:0;">
         <b>${esc(it.game)}</b>　<span class="mkMeta">${esc(it.source)||'-'} · 首見 ${esc(it.firstSeen)||'-'} · 存活 ${survivalDays(it.firstSeen)} 天</span>
         <div class="mkMeta">${it.tags ? '✓ 已標籤：' + esc([it.tags.訴求類型, it.tags.主色系, it.tags.特效強度].filter(Boolean).join(' · ')) : '待分析'}</div>
@@ -1791,27 +2197,33 @@ document.getElementById('mkFormImportBtn').addEventListener('click', async ()=>{
     const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'action=marketImport');
     const data = await res.json();
     if(!data || !Array.isArray(data.items)) throw new Error(data && data.error ? data.error : '回傳格式不正確');
-    const items = marketAll();
-    const ids = new Set(items.map(i=>i.id));
-    let added = 0, skipped = 0;
-    data.items.forEach(it=>{
-      if(!it.id || ids.has(it.id)){ skipped++; return; }
-      items.push({
-        id: it.id,
-        name: it.name || `市場_${it.game||'未命名'}_${it.id}`,
-        game: it.game || '未命名', source: it.source || 'Google表單',
-        firstSeen: it.firstSeen || '', addedAt: new Date().toISOString().slice(0,10),
-        dataUrl: it.imageBase64 ? `data:${it.mime||'image/jpeg'};base64,${it.imageBase64}` : 'data:,',
-        tags: null
-      });
-      added++;
-    });
-    marketSave(items);
-    renderMarketList();
-    hint.textContent = `✓ 匯入 ${added} 筆（略過重複 ${skipped} 筆）。接著點「產生市場素材分析 Prompt」進行標籤`;
+    const r = mergeMarketItems(data.items, 'Google表單');
+    hint.textContent = `✓ 匯入 ${r.added} 筆（略過重複 ${r.skipped} 筆）。接著點「產生市場素材分析 Prompt」進行標籤`;
   }catch(err){
     hint.textContent = '匯入失敗：' + err.message + '（確認 GAS 已部署最新版、存取權為任何人）';
   }
+});
+
+// ── 擷取檔匯入（書籤小工具 / 情報工具轉出的 JSON）───────
+document.getElementById('mkJsonImportBtn').addEventListener('click', ()=>document.getElementById('mkJsonImportInput').click());
+document.getElementById('mkJsonImportInput').addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  const hint = document.getElementById('mkFormHint');
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    try{
+      const data = JSON.parse(ev.target.result);
+      const list = Array.isArray(data) ? data : data.items;
+      if(!Array.isArray(list)) throw new Error('找不到 items 陣列');
+      const r = mergeMarketItems(list, data.source || '擷取檔');
+      const noImg = list.filter(it=>it && !it.imageBase64 && it.imageUrl).length;
+      hint.textContent = `✓ 匯入 ${r.added} 筆（略過重複 ${r.skipped} 筆）`
+        + (noImg ? `；其中 ${noImg} 筆以圖片連結顯示（來源網站阻擋跨站讀取時的後備）` : '');
+    }catch(err){ hint.textContent = '匯入失敗：' + err.message; }
+    e.target.value='';
+  };
+  reader.readAsText(f);
 });
 
 // ── 我方 × 市場 特徵分佈對比 ──────────────────────────
@@ -1952,6 +2364,7 @@ renderHistory();
 renderHypotheses(null);
 renderMarketList();
 renderCustomDims();
+refreshApiUI();
 </script>
 </body>
 </html>

@@ -120,6 +120,14 @@
   .histItem .meta{color:var(--text-muted); font-size:11.5px;}
   .histItem button{height:26px; font-size:11.5px; padding:0 10px;}
   /* 特徵交叉驗證與素材對比 */
+  .apifySub{border-top:1px solid var(--border); padding-top:10px; margin-top:10px;}
+  .apifySubT{font-size:12.5px; font-weight:600; margin:0 0 8px;}
+  .miniLb{display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--text-secondary);}
+  .cpChip{display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border-strong); border-radius:8px; padding:5px 9px; font-size:12px; margin:0 8px 6px 0; background:var(--bg);}
+  .cpChip.off{opacity:.45;}
+  .cpChip input{width:14px; height:14px;}
+  .cpChip .cpDel{border:none; background:transparent; color:var(--coral); cursor:pointer; font-size:12px; padding:0 2px;}
+  .cpChip .cpKind{font-size:10px; color:var(--text-muted); background:var(--surface); border-radius:4px; padding:1px 5px;}
   .apiPanel{border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:14px; background:linear-gradient(180deg, #f7fbf9, var(--surface));}
   .apiBadge{display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; margin-left:6px; vertical-align:1px;}
   .apiBadge.off{background:#eeece6; color:var(--text-muted);}
@@ -396,7 +404,8 @@
         <button class="ghostBtn" id="mkUploadBtn">選擇圖片加入</button>
         <input type="file" id="mkUploadInput" accept="image/*" multiple style="display:none;">
         <button class="ghostBtn" id="mkFormImportBtn">從 Google 表單匯入</button>
-        <button class="primaryBtn" id="apifySyncBtn" style="height:34px; font-size:13px; display:none;">⚡ 一鍵同步競品素材</button>
+        <button class="primaryBtn" id="apifyRunBtn" style="height:34px; font-size:13px; display:none;">▶ 執行新一輪抓取</button>
+        <button class="ghostBtn" id="apifySyncBtn" style="height:34px; font-size:13px; display:none;">⚡ 讀取最近一次執行</button>
         <button class="ghostBtn" id="apifyCfgBtn" style="height:34px; font-size:13px;">Apify 設定</button>
         <button class="ghostBtn" id="mkJsonImportBtn">匯入擷取檔 / Apify JSON</button>
         <input type="file" id="mkJsonImportInput" accept=".json" style="display:none;">
@@ -416,11 +425,51 @@
         <p style="font-size:13px; font-weight:600; margin:0 0 8px;">Apify 直連設定 <span id="apifyStatus" class="apiBadge off">未設定</span></p>
         <p class="sub" style="margin:0 0 8px; font-size:12px;">設定後，工具直接讀取 Apify 上「最近一次成功執行」的結果——不需匯出、下載、選檔。Token 只存在這台瀏覽器。</p>
         <div class="controls" style="margin-bottom:8px;">
-          <input type="password" id="apifyToken" placeholder="Apify API Token（設定 → Integrations）" style="flex:1; min-width:240px;">
-          <input id="apifyTaskId" placeholder="Task ID 或 使用者名稱~任務名" style="width:230px;">
+          <input type="password" id="apifyToken" placeholder="Apify API Token（Settings → Integrations）" style="flex:1; min-width:240px;">
           <button class="ghostBtn" id="apifySaveBtn">儲存</button>
           <button class="ghostBtn" id="apifyTestBtn">測試連線</button>
           <button class="ghostBtn" id="apifyClearBtn" style="color:var(--coral);">清除</button>
+        </div>
+
+        <div class="apifySub">
+          <p class="apifySubT">Actor 與執行參數</p>
+          <div class="controls">
+            <input id="apifyActor" placeholder="Actor（作者~名稱）" style="width:290px;">
+            <label class="miniLb">地區<input id="apifyRegion" value="TW" style="width:60px;"></label>
+            <label class="miniLb">抓取上限<input id="apifyLimit" type="number" value="100" min="1" max="1000" style="width:80px;"></label>
+            <label class="miniLb">期間<select id="apifyDays" style="width:110px;">
+              <option value="7">過去 7 天</option>
+              <option value="30" selected>過去 30 天</option>
+              <option value="90">過去 90 天</option>
+              <option value="">不限</option>
+            </select></label>
+          </div>
+        </div>
+
+        <div class="apifySub">
+          <p class="apifySubT">監控名單 <span class="sub" style="font-weight:400;">勾選要抓的對象；廣告主 ID（AR…）較精準，網域較方便</span></p>
+          <div class="controls" style="margin-bottom:8px;">
+            <input id="cpName" placeholder="顯示名稱，例：天堂W" style="width:150px;">
+            <select id="cpType" style="width:120px;">
+              <option value="advertiser">廣告主 ID</option>
+              <option value="domain">網域</option>
+              <option value="url">完整網址</option>
+            </select>
+            <input id="cpValue" placeholder="AR0833… 或 example.com" style="flex:1; min-width:180px;">
+            <button class="ghostBtn" id="cpAddBtn">新增</button>
+          </div>
+          <div id="cpList"></div>
+        </div>
+
+        <div class="apifySub">
+          <p class="apifySubT">Task 預設組 <span class="sub" style="font-weight:400;">「讀取最近執行」會用選中的 Task；直接觸發新執行則不需要 Task</span></p>
+          <div class="controls">
+            <select id="apifyTaskSel" style="width:230px;"></select>
+            <input id="tkName" placeholder="組名" style="width:130px;">
+            <input id="apifyTaskId" placeholder="Task ID 或 帳號~任務名" style="width:200px;">
+            <button class="ghostBtn" id="tkAddBtn">新增/更新</button>
+            <button class="ghostBtn" id="tkDelBtn" style="color:var(--coral);">刪除</button>
+          </div>
         </div>
         <span class="progressText" id="apifyHint" style="margin-top:0;"></span>
       </div>
@@ -2434,17 +2483,102 @@ document.getElementById('mkJsonImportInput').addEventListener('change', e=>{
 // Token 僅存本機，不進備份/同步；失敗時仍可用手動匯入 JSON
 // ══════════════════════════════════════════════════════════
 LS.apifyToken = 'mt_apify_token';
-LS.apifyTask = 'mt_apify_task';
+LS.apifyTask = 'mt_apify_task';          // 目前選用的 Task ID（相容舊版）
+LS.apifyActor = 'mt_apify_actor';
+LS.apifyParams = 'mt_apify_params';
+LS.apifyTargets = 'mt_apify_targets';    // 監控名單
+LS.apifyTasks = 'mt_apify_tasks';        // Task 預設組
+
+const APIFY_DEFAULT_ACTOR = 'silva95gustavo~google-ads-scraper';
+const APIFY_DEFAULT_PARAMS = { region:'TW', limit:100, days:30 };
+// 預設監控名單：沿用你目前 Input 的兩個 startUrls（beanfun 為我方網域，已標註）
+const APIFY_DEFAULT_TARGETS = [
+  { name:'遊戲橘子（beanfun，我方）', type:'domain', value:'beanfun.com', on:false },
+  { name:'台灣全部廣告（未篩選）', type:'url', value:'https://adstransparency.google.com/?region=TW', on:false },
+];
+
 function getApifyToken(){ return String(lsGet(LS.apifyToken,'')||'').trim(); }
 function getApifyTask(){ return String(lsGet(LS.apifyTask,'')||'').trim(); }
-function hasApify(){ return !!(getApifyToken() && getApifyTask()); }
+function getApifyActor(){ return String(lsGet(LS.apifyActor,'')||'').trim() || APIFY_DEFAULT_ACTOR; }
+function getApifyParams(){ return Object.assign({}, APIFY_DEFAULT_PARAMS, lsGet(LS.apifyParams, {})); }
+function getApifyTargets(){ const t = lsGet(LS.apifyTargets, null); return Array.isArray(t) ? t : APIFY_DEFAULT_TARGETS.slice(); }
+function getApifyTasks(){ return lsGet(LS.apifyTasks, []); }
+function hasApify(){ return !!getApifyToken(); }
+function hasApifyTask(){ return !!(getApifyToken() && getApifyTask()); }
+function enabledTargets(){ return getApifyTargets().filter(t=>t.on); }
 
+// 監控對象 → Google 廣告透明中心網址
+function targetToUrl(t){
+  const p = getApifyParams();
+  const region = encodeURIComponent(p.region || 'TW');
+  const days = p.days ? `&preset-date=Last+${p.days}+days` : '';
+  if(t.type === 'url') return String(t.value); // 合法性由 isSafeTransparencyUrl 把關
+  if(t.type === 'advertiser'){
+    const id = String(t.value).trim();
+    return `https://adstransparency.google.com/advertiser/${encodeURIComponent(id)}?region=${region}${days}`;
+  }
+  return `https://adstransparency.google.com/?region=${region}&domain=${encodeURIComponent(String(t.value).trim())}${days}`;
+}
+// 只允許送出 Google 廣告透明中心的網址——localStorage 可能被竄改，不能只信任新增時的驗證
+function isSafeTransparencyUrl(u){
+  return typeof u === 'string' && /^https:\/\/adstransparency\.google\.com\//.test(u);
+}
+function buildApifyInput(){
+  const p = getApifyParams();
+  const urls = enabledTargets()
+    .map(t=>targetToUrl(t))
+    .filter(isSafeTransparencyUrl)
+    .map(url=>({ url }));
+  return {
+    ocr: false,
+    resultsLimit: Math.max(1, Math.min(1000, +p.limit || 100)),
+    shouldDownloadAssets: false,
+    shouldDownloadPreviews: false,
+    skipDetails: false,
+    startUrls: urls,
+  };
+}
+
+// ── UI 渲染 ──
 function refreshApifyUI(){
   const on = hasApify();
   const b = document.getElementById('apifyStatus');
-  b.textContent = on ? '已設定' : '未設定';
+  const n = enabledTargets().length;
+  b.textContent = on ? `已設定（監控 ${n} 個對象）` : '未設定';
   b.className = 'apiBadge ' + (on ? 'on' : 'off');
-  document.getElementById('apifySyncBtn').style.display = on ? '' : 'none';
+  document.getElementById('apifyRunBtn').style.display = (on && n) ? '' : 'none';
+  document.getElementById('apifySyncBtn').style.display = hasApifyTask() ? '' : 'none';
+}
+function renderTargets(){
+  const el = document.getElementById('cpList');
+  const list = getApifyTargets();
+  el.innerHTML = list.length ? list.map((t,i)=>{
+    const kind = t.type==='advertiser' ? '廣告主' : (t.type==='domain' ? '網域' : '網址');
+    return `<span class="cpChip ${t.on?'':'off'}">
+      <input type="checkbox" class="cpOn" data-i="${i}" ${t.on?'checked':''}>
+      <b>${esc(t.name)}</b>
+      <span class="cpKind">${kind}</span>
+      <span style="color:var(--text-muted); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(String(t.value).slice(0,40))}</span>
+      <button class="cpDel" data-i="${i}">✕</button>
+    </span>`;
+  }).join('') : '<span class="sub" style="font-size:12px;">尚無監控對象。新增競品的廣告主 ID 或網域。</span>';
+  el.querySelectorAll('.cpOn').forEach(c=>c.addEventListener('change', ()=>{
+    const l = getApifyTargets(); l[+c.dataset.i].on = c.checked; lsSet(LS.apifyTargets, l);
+    renderTargets(); refreshApifyUI();
+  }));
+  el.querySelectorAll('.cpDel').forEach(b2=>b2.addEventListener('click', ()=>{
+    const l = getApifyTargets();
+    if(!confirm(`移除監控對象「${l[+b2.dataset.i].name}」？`)) return;
+    l.splice(+b2.dataset.i,1); lsSet(LS.apifyTargets, l);
+    renderTargets(); refreshApifyUI();
+  }));
+}
+function renderApifyTasks(){
+  const sel = document.getElementById('apifyTaskSel');
+  const tasks = getApifyTasks();
+  const cur = getApifyTask();
+  sel.innerHTML = '<option value="">（不使用 Task）</option>' +
+    tasks.map(t=>`<option value="${esc(t.id)}" ${t.id===cur?'selected':''}>${esc(t.name)}</option>`).join('');
 }
 document.getElementById('apifyCfgBtn').addEventListener('click', ()=>{
   const box = document.getElementById('apifyCfg');
@@ -2452,102 +2586,248 @@ document.getElementById('apifyCfgBtn').addEventListener('click', ()=>{
   box.style.display = open ? 'block' : 'none';
   if(open){
     document.getElementById('apifyToken').value = getApifyToken();
+    document.getElementById('apifyActor').value = getApifyActor();
+    const p = getApifyParams();
+    document.getElementById('apifyRegion').value = p.region;
+    document.getElementById('apifyLimit').value = p.limit;
+    document.getElementById('apifyDays').value = String(p.days || '');
     document.getElementById('apifyTaskId').value = getApifyTask();
+    renderTargets(); renderApifyTasks();
   }
 });
-document.getElementById('apifySaveBtn').addEventListener('click', ()=>{
+function saveApifyCfg(){
   lsSet(LS.apifyToken, document.getElementById('apifyToken').value.trim());
+  lsSet(LS.apifyActor, document.getElementById('apifyActor').value.trim());
+  lsSet(LS.apifyParams, {
+    region: document.getElementById('apifyRegion').value.trim() || 'TW',
+    limit: +document.getElementById('apifyLimit').value || 100,
+    days: document.getElementById('apifyDays').value ? +document.getElementById('apifyDays').value : 0,
+  });
   lsSet(LS.apifyTask, document.getElementById('apifyTaskId').value.trim());
-  document.getElementById('apifyHint').textContent = '✓ 已儲存（僅存於本機瀏覽器）';
+}
+document.getElementById('apifySaveBtn').addEventListener('click', ()=>{
+  saveApifyCfg();
+  document.getElementById('apifyHint').textContent = '✓ 已儲存（Token 僅存於本機瀏覽器）';
   refreshApifyUI();
 });
 document.getElementById('apifyClearBtn').addEventListener('click', ()=>{
-  if(!confirm('清除 Apify Token 與 Task 設定？')) return;
-  lsSet(LS.apifyToken,''); lsSet(LS.apifyTask,'');
+  if(!confirm('清除 Apify Token？（監控名單與參數會保留）')) return;
+  lsSet(LS.apifyToken,'');
   document.getElementById('apifyToken').value = '';
-  document.getElementById('apifyTaskId').value = '';
-  document.getElementById('apifyHint').textContent = '已清除，將回到手動匯入 JSON 流程';
+  document.getElementById('apifyHint').textContent = '已清除 Token，將回到手動匯入 JSON 流程';
   refreshApifyUI();
 });
-async function apifyFetchItems(){
-  const token = getApifyToken(), task = getApifyTask();
-  if(!token || !task) throw new Error('尚未設定 Apify Token 與 Task');
-  // 任務 ID 可能是 abc123 或 username~task-name，兩者皆需編碼
-  const url = `https://api.apify.com/v2/actor-tasks/${encodeURIComponent(task)}/runs/last/dataset/items`
-    + `?token=${encodeURIComponent(token)}&status=SUCCEEDED&clean=true&limit=200`;
+// 監控名單
+document.getElementById('cpAddBtn').addEventListener('click', ()=>{
+  saveApifyCfg(); // 同上：避免使用者填了 Token 卻直接新增監控對象而遺失
+  const name = document.getElementById('cpName').value.trim();
+  const type = document.getElementById('cpType').value;
+  let value = document.getElementById('cpValue').value.trim();
+  if(!name || !value){ alert('請填顯示名稱與值'); return; }
+  if(/["\\\n\r]/.test(name)){ alert('名稱不可含引號、反斜線或換行'); return; }
+  if(type==='url' && !/^https:\/\/adstransparency\.google\.com\//.test(value)){
+    alert('完整網址必須是 https://adstransparency.google.com/ 開頭'); return;
+  }
+  if(type==='advertiser'){
+    // 容錯：貼整個網址也接受，自動抽出 AR 開頭 ID
+    const m = value.match(/AR[0-9A-Za-z_-]+/);
+    if(!m){ alert('廣告主 ID 應為 AR 開頭（可直接貼上透明中心網址，工具會自動擷取）'); return; }
+    value = m[0];
+  }
+  if(type==='domain'){
+    value = value.replace(/^https?:\/\//,'').replace(/\/.*$/,'');
+    if(!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(value)){ alert('網域格式不正確，例：example.com'); return; }
+  }
+  const list = getApifyTargets();
+  if(list.some(t=>t.type===type && t.value===value)){ alert('此對象已在名單中'); return; }
+  list.push({ name, type, value, on:true });
+  lsSet(LS.apifyTargets, list);
+  document.getElementById('cpName').value=''; document.getElementById('cpValue').value='';
+  renderTargets(); refreshApifyUI();
+});
+// Task 預設組
+document.getElementById('apifyTaskSel').addEventListener('change', e=>{
+  lsSet(LS.apifyTask, e.target.value);
+  const t = getApifyTasks().find(x=>x.id===e.target.value);
+  document.getElementById('apifyTaskId').value = e.target.value;
+  document.getElementById('tkName').value = t ? t.name : '';
+  refreshApifyUI();
+});
+document.getElementById('tkAddBtn').addEventListener('click', ()=>{
+  saveApifyCfg(); // 使用者可能填了 Token 卻直接按這裡，先一併保存避免遺失
+  const name = document.getElementById('tkName').value.trim();
+  const id = document.getElementById('apifyTaskId').value.trim();
+  if(!name || !id){ alert('請填組名與 Task ID'); return; }
+  if(/["\\\n\r]/.test(name)){ alert('組名不可含引號、反斜線或換行'); return; }
+  const tasks = getApifyTasks();
+  const i = tasks.findIndex(t=>t.id===id);
+  if(i>=0) tasks[i].name = name; else tasks.push({ name, id });
+  lsSet(LS.apifyTasks, tasks);
+  lsSet(LS.apifyTask, id);
+  renderApifyTasks(); refreshApifyUI();
+  document.getElementById('apifyHint').textContent = `✓ 已儲存 Task 組「${name}」`;
+});
+document.getElementById('tkDelBtn').addEventListener('click', ()=>{
+  const id = document.getElementById('apifyTaskId').value.trim();
+  const tasks = getApifyTasks();
+  const i = tasks.findIndex(t=>t.id===id);
+  if(i<0){ alert('找不到此 Task 組'); return; }
+  if(!confirm(`刪除 Task 組「${tasks[i].name}」？`)) return;
+  tasks.splice(i,1); lsSet(LS.apifyTasks, tasks);
+  if(getApifyTask()===id) lsSet(LS.apifyTask,'');
+  document.getElementById('apifyTaskId').value=''; document.getElementById('tkName').value='';
+  renderApifyTasks(); refreshApifyUI();
+});
+
+// ── Apify API ──
+const APIFY_API = 'https://api.apify.com/v2/';
+async function apifyReq(path, opts){
+  opts = opts || {};
+  const token = getApifyToken();
+  if(!token) throw new Error('尚未設定 Apify Token');
+  // Token 走 Authorization header，不放進 URL——避免出現在瀏覽器歷史、referrer 或伺服器日誌
+  const url = APIFY_API + path;
+  const headers = { 'Authorization': 'Bearer ' + token };
+  if(opts.body) headers['Content-Type'] = 'application/json';
   const ctrl = new AbortController();
-  const timer = setTimeout(()=>ctrl.abort(), 30000);
+  const timer = setTimeout(()=>ctrl.abort(), opts.timeoutMs || 30000);
   let res;
   try{
-    res = await fetch(url, { signal: ctrl.signal });
+    res = await fetch(url, {
+      method: opts.method || 'GET',
+      headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: ctrl.signal,
+    });
   }catch(e){
     clearTimeout(timer);
-    if(e && e.name === 'AbortError') throw new Error('連線逾時（30 秒）');
-    throw new Error('無法連線至 Apify（可能是網路或跨站限制）——可改用「匯入擷取檔 / Apify JSON」手動流程');
+    if(e && e.name==='AbortError') throw new Error('連線逾時');
+    throw new Error('無法連線至 Apify（網路或跨站限制）——可改用手動匯入 JSON');
   }
   clearTimeout(timer);
-  if(res.status === 401 || res.status === 403) throw new Error('Token 無效或無權限存取此任務');
-  if(res.status === 404) throw new Error('找不到該 Task，或該任務尚無成功執行的紀錄');
+  if(res.status===401 || res.status===403) throw new Error('Token 無效或無權限');
+  if(res.status===404) throw new Error('找不到指定的 Actor / Task / 執行紀錄');
+  if(res.status===402) throw new Error('Apify 額度不足');
   if(!res.ok) throw new Error('Apify 回應錯誤 HTTP ' + res.status);
-  const data = await res.json();
+  return res.json();
+}
+async function apifyFetchItems(){
+  const task = getApifyTask();
+  if(!task) throw new Error('尚未選擇 Task');
+  const data = await apifyReq(`actor-tasks/${encodeURIComponent(task)}/runs/last/dataset/items?status=SUCCEEDED&clean=true&limit=500`);
+  if(!Array.isArray(data)) throw new Error('Apify 回傳格式非預期');
+  return data;
+}
+// 直接觸發 Actor 執行（不需 Task）
+async function apifyStartRun(){
+  const actor = getApifyActor();
+  const input = buildApifyInput();
+  if(!input.startUrls.length) throw new Error('監控名單中沒有勾選任何對象');
+  const r = await apifyReq(`acts/${encodeURIComponent(actor)}/runs`, { method:'POST', body: input });
+  const id = r && r.data && r.data.id;
+  if(!id) throw new Error('無法啟動執行（回應中沒有 run id）');
+  return id;
+}
+async function apifyWaitRun(runId, onTick){
+  const MAX_MS = 10*60*1000, INTERVAL = 5000;
+  const t0 = Date.now();
+  while(Date.now()-t0 < MAX_MS){
+    const r = await apifyReq(`actor-runs/${encodeURIComponent(runId)}`);
+    const st = r && r.data && r.data.status;
+    if(onTick) onTick(st, Math.round((Date.now()-t0)/1000));
+    if(st === 'SUCCEEDED') return r.data;
+    if(st === 'FAILED' || st === 'ABORTED' || st === 'TIMED-OUT'){
+      throw new Error('Apify 執行失敗（狀態：' + st + '）——可到 Apify 網站查看執行紀錄');
+    }
+    await sleep(INTERVAL);
+  }
+  throw new Error('等待逾時（10 分鐘）——執行可能仍在進行，稍後可點「⚡ 讀取最近一次執行」取回結果');
+}
+async function apifyRunItems(runId){
+  const data = await apifyReq(`actor-runs/${encodeURIComponent(runId)}/dataset/items?clean=true&limit=500`);
   if(!Array.isArray(data)) throw new Error('Apify 回傳格式非預期');
   return data;
 }
 document.getElementById('apifyTestBtn').addEventListener('click', async ()=>{
   const hint = document.getElementById('apifyHint');
-  lsSet(LS.apifyToken, document.getElementById('apifyToken').value.trim());
-  lsSet(LS.apifyTask, document.getElementById('apifyTaskId').value.trim());
+  saveApifyCfg();
   hint.textContent = '測試中…';
   try{
-    const items = await apifyFetchItems();
-    hint.textContent = `✓ 連線成功：最近一次執行有 ${items.length} 筆資料`;
+    const me = await apifyReq('users/me');
+    const name = (me && me.data && (me.data.username || me.data.userId)) || '成功';
+    let extra = '';
+    if(getApifyTask()){
+      try{ const items = await apifyFetchItems(); extra = `；Task 最近一次執行有 ${items.length} 筆資料`; }
+      catch(e){ extra = `；但 Task 讀取失敗（${e.message}）`; }
+    }
+    hint.textContent = `✓ Token 有效（帳號 ${name}）${extra}`;
     refreshApifyUI();
   }catch(e){ hint.textContent = '✗ ' + e.message; }
 });
 
-// ── 一鍵同步：抓資料 → 匯入 → 抓圖 → 標籤 ──
-document.getElementById('apifySyncBtn').addEventListener('click', async ()=>{
-  const btn = document.getElementById('apifySyncBtn');
-  const P = (done,total,label)=>setProg('apifyProgBar','apifyProgText','apifyProgress',done,total,label);
+// ── 匯入 → 抓圖 → 標籤（共用尾段）──
+async function apifyIngest(raw, P, base){
+  P(base+1, 4, `2/4 識別欄位並匯入（原始 ${raw.length} 筆）…`);
+  const norm = normalizeExternalItems(raw, 'Apify · Google廣告透明中心');
+  const dropped = raw.length - norm.length;
+  const r = mergeMarketItems(norm, 'Apify · Google廣告透明中心');
+  const img = await fetchMarketImages((i, total, o, f)=>{
+    P(base+2 + i/Math.max(1,total), 4, `3/4 抓取圖片 ${i+1}/${total}（成功 ${o}、失敗 ${f}）`);
+  });
+  let taggedNote = '（未設 Gemini API Key，請手動標籤）';
+  if(hasApi()){
+    const dims = allCrossDims();
+    const pending = marketAll().filter(m=>imgPart(m.dataUrl) && (!m.tags || dims.some(d=>!m.tags[d])));
+    if(pending.length){
+      const tags = await autoTagImages(pending, (d,t)=>P(base+3 + d/t, 4, `4/4 AI 標籤 ${d}/${t}…`), true);
+      const all = marketAll();
+      all.forEach(it=>{ if(tags[it.name]) it.tags = tags[it.name]; });
+      marketSave(all);
+    }
+    taggedNote = '，已完成 AI 標籤';
+  }
+  renderMarketList();
+  return { added:r.added, skipped:r.skipped, dropped, ok:img.ok, failed:img.failed, taggedNote };
+}
+function apifySummary(s, secs){
+  return `✓ 完成（${secs} 秒）：新增 ${s.added} 筆、重複 ${s.skipped} 筆`
+    + (s.dropped ? `、無圖片略過 ${s.dropped} 筆` : '')
+    + `；圖片成功 ${s.ok}／失敗 ${s.failed}${s.taggedNote}`;
+}
+
+// ── ▶ 執行新一輪抓取（觸發 Actor → 等待 → 匯入）──
+document.getElementById('apifyRunBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('apifyRunBtn');
+  const P = (d,t,l)=>setProg('apifyProgBar','apifyProgText','apifyProgress',d,t,l);
+  const targets = enabledTargets();
+  if(!confirm(`將在 Apify 執行新一輪抓取（監控 ${targets.length} 個對象、上限 ${getApifyParams().limit} 筆）。\n這會消耗 Apify 額度，且需要數分鐘。要繼續嗎？`)) return;
   btn.disabled = true;
   const t0 = Date.now();
   try{
-    // 1/4 讀取
-    P(0,4,'1/4 讀取 Apify 最新執行結果…');
-    const raw = await apifyFetchItems();
-    // 2/4 識別與匯入
-    P(1,4,`2/4 識別欄位並匯入（原始 ${raw.length} 筆）…`);
-    const norm = normalizeExternalItems(raw, 'Apify · Google廣告透明中心');
-    const dropped = raw.length - norm.length;
-    const r = mergeMarketItems(norm, 'Apify · Google廣告透明中心');
-    if(!r.added && !marketAll().some(m=>(!m.dataUrl||m.dataUrl==='data:,') && m.imageUrl)){
-      P(4,4,`✓ 完成：無新素材（重複 ${r.skipped} 筆${dropped?`、無圖片 ${dropped} 筆`:''}）`);
-      return;
-    }
-    // 3/4 抓圖（與手動按鈕共用同一份邏輯）
-    const img = await fetchMarketImages((i, total, o, f)=>{
-      P(2 + i/Math.max(1,total), 4, `3/4 抓取圖片 ${i+1}/${total}（成功 ${o}、失敗 ${f}）`);
-    });
-    const ok = img.ok, failed = img.failed;
-    // 4/4 標籤（需 Gemini API）
-    if(hasApi()){
-      const dims = allCrossDims();
-      const pending = marketAll().filter(m=>imgPart(m.dataUrl) && (!m.tags || dims.some(d=>!m.tags[d])));
-      if(pending.length){
-        const tags = await autoTagImages(pending, (d,t)=>P(3+d/t, 4, `4/4 AI 標籤 ${d}/${t}…`), true);
-        const all = marketAll();
-        all.forEach(it=>{ if(tags[it.name]) it.tags = tags[it.name]; });
-        marketSave(all);
-      }
-    }
-    renderMarketList();
-    const secs = ((Date.now()-t0)/1000).toFixed(0);
-    P(4,4, `✓ 完成（${secs} 秒）：新增 ${r.added} 筆、重複 ${r.skipped} 筆`
-      + (dropped ? `、無圖片略過 ${dropped} 筆` : '')
-      + `；圖片成功 ${ok}／失敗 ${failed}`
-      + (hasApi() ? '，已完成 AI 標籤' : '（未設 Gemini API Key，請手動標籤）'));
+    P(0, 4, '1/4 啟動 Apify 執行…');
+    const runId = await apifyStartRun();
+    await apifyWaitRun(runId, (st, s)=>P(0.5, 4, `1/4 Apify 執行中（${st}，已 ${s} 秒）…可放著等，勿關閉分頁`));
+    const raw = await apifyRunItems(runId);
+    const s = await apifyIngest(raw, P, 0);
+    P(4, 4, apifySummary(s, ((Date.now()-t0)/1000).toFixed(0)));
   }catch(e){
-    P(0,1,'✗ 失敗：' + e.message);
+    P(0, 1, '✗ 失敗：' + e.message);
+  }finally{ btn.disabled = false; }
+});
+
+// ── ⚡ 讀取最近一次執行（不消耗額度）──
+document.getElementById('apifySyncBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('apifySyncBtn');
+  const P = (d,t,l)=>setProg('apifyProgBar','apifyProgText','apifyProgress',d,t,l);
+  btn.disabled = true;
+  const t0 = Date.now();
+  try{
+    P(0, 4, '1/4 讀取 Apify 最近一次執行結果…');
+    const raw = await apifyFetchItems();
+    const s = await apifyIngest(raw, P, 0);
+    P(4, 4, apifySummary(s, ((Date.now()-t0)/1000).toFixed(0)));
+  }catch(e){
+    P(0, 1, '✗ 失敗：' + e.message);
   }finally{ btn.disabled = false; }
 });
 

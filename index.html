@@ -2246,39 +2246,78 @@ function survivalDays(firstSeen){
   const d = Math.round((Date.now() - ts)/86400000);
   return Math.max(1, Math.min(120, d));
 }
-// 來源格式自動識別：Apify（Google廣告透明中心）/ 書籤擷取檔 / Google 表單
+// 來源格式自動識別：Apify（任何 Actor）/ 書籤擷取檔 / Google 表單
+// 不同 Actor 的欄位名差異極大，因此不寫死欄位名——遞迴掃描整筆資料找出可用內容
 function djb2(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36); }
-function pick(o, keys){ for(const k of keys){ if(o[k]!=null && o[k]!=='') return o[k]; } return ''; }
+
+const IMG_EXT_RE = /\.(jpe?g|png|webp|gif)(\?|#|$)/i;
+const IMG_HOST_RE = /(tpc\.googlesyndication\.com|googleusercontent\.com|ggpht\.com|gstatic\.com|lh[0-9]\.google|s0\.2mdn\.net|doubleclick\.net)/i;
+const VIDEO_RE = /(youtube\.com|youtu\.be|\.mp4(\?|#|$)|\.webm(\?|#|$))/i;
+
+// 遞迴走訪，收集所有字串值與其鍵名路徑
+function walkStrings(obj, cb, depth){
+  depth = depth || 0;
+  if(depth > 6 || obj == null) return;
+  if(typeof obj === 'string'){ cb('', obj); return; }
+  if(Array.isArray(obj)){ obj.forEach(v=>walkStrings(v, cb, depth+1)); return; }
+  if(typeof obj === 'object'){
+    Object.keys(obj).forEach(k=>{
+      const v = obj[k];
+      if(typeof v === 'string') cb(k, v);
+      else if(typeof v === 'number') cb(k, String(v));
+      // 巢狀：以「父鍵.子鍵」形式往下傳，讓 advertiser:{name:'X'} 也能被辨識
+      else walkStrings(v, (kk, vv)=>cb(kk ? (k + '.' + kk) : k, vv), depth+1);
+    });
+  }
+}
+// 從任意結構中萃取：圖片網址、廣告連結、廣告主、日期、ID
+function extractAdFields(item){
+  const out = { image:null, adUrl:null, advertiser:'', id:'', date:'', hasVideo:false };
+  const dateCands = [];
+  walkStrings(item, (key, val)=>{
+    const k = String(key).toLowerCase();
+    const v = String(val);
+    if(/^https?:\/\//i.test(v)){
+      if(!out.adUrl && /adstransparency\.google\.com/i.test(v)) out.adUrl = v;
+      if(VIDEO_RE.test(v)) out.hasVideo = true;
+      // 圖片：副檔名或已知廣告 CDN，且鍵名不是明顯的非圖片用途
+      const looksImg = IMG_EXT_RE.test(v) || IMG_HOST_RE.test(v);
+      const badKey = /destination|landing|click|advertiserurl|profile|favicon|logo/i.test(k);
+      if(!out.image && looksImg && !badKey && !/adstransparency\.google\.com/i.test(v)) out.image = v;
+    }
+    // 支援扁平（advertiserName）與巢狀路徑（advertiser.name / brand.title）
+    if(!out.advertiser
+       && /(^|\.)(advertiser|brand|company|domain)(name|title|\.name|\.title)?$/i.test(k)
+       && !/id$/i.test(k) && v && !/^https?:/i.test(v) && v.length < 80) out.advertiser = v;
+    if(!out.id && /(^|\.)(creativeid|adid|creative_id|ad_id|id)$/i.test(k) && v) out.id = v;
+    if(/first|start|shown|date|since/i.test(k) && v && !/^https?:/i.test(v)) dateCands.push(v);
+  });
+  // 日期：取最早的一個可解析值
+  const parsed = dateCands.map(v=>{ const d = new Date(v); return isNaN(d.getTime()) ? null : d; }).filter(Boolean);
+  if(parsed.length){
+    parsed.sort((a,b)=>a-b);
+    out.date = parsed[0].toISOString().slice(0,10);
+  }
+  return out;
+}
 function normalizeExternalItems(list, defaultSource){
   const out = [];
   (list||[]).forEach(it=>{
     if(!it || typeof it!=='object') return;
-    // 已是本工具格式（書籤/表單）→ 原樣通過
-    if(it.imageBase64 !== undefined || (it.id && it.game !== undefined)){ out.push(it); return; }
+    // 已是本工具格式（書籤 / 表單）→ 原樣通過
+    if(it.imageBase64 !== undefined || (it.id && it.game !== undefined && it.name !== undefined)){ out.push(it); return; }
 
-    // ── Apify 格式自動識別 ──
-    let img = pick(it, ['imageUrl','image','creativeImageUrl','thumbnailUrl','previewImageUrl']);
-    if(!img && Array.isArray(it.imageUrls) && it.imageUrls.length) img = it.imageUrls[0];
-    if(!img && Array.isArray(it.images) && it.images.length) img = (typeof it.images[0]==='string' ? it.images[0] : it.images[0].url) || '';
-    const fmt = String(pick(it, ['adFormat','format','type']) || '').toLowerCase();
-    // 純文字/影片廣告沒有圖片內容，無法做視覺分析 → 略過
-    if(!img || !/^https?:\/\//.test(String(img))) return;
-    if(fmt && /text|video/.test(fmt) && !img) return;
+    const f = extractAdFields(it);
+    if(!f.image) return; // 純文字 / 純影片廣告：無圖可做視覺分析
 
-    const game = String(pick(it, ['advertiserName','advertiser','advertiserId','domain']) || '未命名');
-    const rawId = String(pick(it, ['creativeId','adId','id']) || djb2(String(img)));
-    const first = pick(it, ['firstShown','firstShownDate','startDate','firstSeen','lastShown','lastShownDate']);
-    let firstSeen = '';
-    if(first){
-      const d = new Date(first);
-      if(!isNaN(d.getTime())) firstSeen = d.toISOString().slice(0,10);
-    }
-    const id = 'ap' + djb2(rawId + '|' + img);
+    const game = String(f.advertiser || '未命名').slice(0, 60);
+    const rawId = String(f.id || djb2(f.image));
+    const id = 'ap' + djb2(rawId + '|' + f.image);
     out.push({
       id, game, source: defaultSource || 'Apify · Google廣告透明中心',
-      firstSeen, name: `市場_${game}_${id}`,
-      imageBase64: '', mime: '', imageUrl: String(img),
-      adUrl: pick(it, ['adUrl','adLibraryUrl','previewUrl']) || null
+      firstSeen: f.date, name: `市場_${game}_${id}`,
+      imageBase64: '', mime: '', imageUrl: f.image,
+      adUrl: f.adUrl || null,
     });
   });
   return out;
@@ -2768,8 +2807,32 @@ document.getElementById('apifyTestBtn').addEventListener('click', async ()=>{
 // ── 匯入 → 抓圖 → 標籤（共用尾段）──
 async function apifyIngest(raw, P, base){
   P(base+1, 4, `2/4 識別欄位並匯入（原始 ${raw.length} 筆）…`);
+  // 診斷 1：Apify 根本沒抓到東西 —— 通常是監控對象的網址沒有實際篩選條件
+  if(!raw.length){
+    const names = enabledTargets().map(t=>t.name).join('、');
+    throw new Error(`Apify 這次執行抓到 0 筆廣告。`
+      + `目前監控對象：${names || '（無）'}。`
+      + `常見原因：網址沒有指定廣告主或網域（例如透明中心首頁），爬蟲看到空頁面。`
+      + `請改用競品的「廣告主 ID（AR…）」或「網域」作為監控對象。`);
+  }
   const norm = normalizeExternalItems(raw, 'Apify · Google廣告透明中心');
   const dropped = raw.length - norm.length;
+  // 診斷 2：有資料但一筆都認不出來 —— 欄位名與預期不同
+  if(raw.length && !norm.length){
+    // 深度掃描仍找不到圖片 → 統計這批資料的型態，給出可行動的診斷
+    let vids = 0, urls = new Set();
+    raw.forEach(it=>{
+      const f = extractAdFields(it);
+      if(f.hasVideo) vids++;
+      walkStrings(it, (k,v)=>{ if(/^https?:\/\//i.test(v) && urls.size < 6) urls.add(String(v).slice(0,70)); });
+    });
+    console.warn('[Apify 診斷] 第一筆完整資料：', raw[0]);
+    console.warn('[Apify 診斷] 找到的網址樣本：', [...urls]);
+    throw new Error(`抓到 ${raw.length} 筆，但沒有一筆含可辨識的圖片網址`
+      + (vids ? `（其中 ${vids} 筆疑似影片廣告，無靜態圖可分析）` : '')
+      + `。若該廣告主主要投放影片或文字廣告，這是正常結果——請改抓有投放圖片廣告的競品。`
+      + `若確定有圖片廣告，請按 F12 開啟主控台，把「[Apify 診斷]」的內容提供給開發者。`);
+  }
   const r = mergeMarketItems(norm, 'Apify · Google廣告透明中心');
   const img = await fetchMarketImages((i, total, o, f)=>{
     P(base+2 + i/Math.max(1,total), 4, `3/4 抓取圖片 ${i+1}/${total}（成功 ${o}、失敗 ${f}）`);

@@ -396,6 +396,8 @@
         <button class="ghostBtn" id="mkUploadBtn">選擇圖片加入</button>
         <input type="file" id="mkUploadInput" accept="image/*" multiple style="display:none;">
         <button class="ghostBtn" id="mkFormImportBtn">從 Google 表單匯入</button>
+        <button class="primaryBtn" id="apifySyncBtn" style="height:34px; font-size:13px; display:none;">⚡ 一鍵同步競品素材</button>
+        <button class="ghostBtn" id="apifyCfgBtn" style="height:34px; font-size:13px;">Apify 設定</button>
         <button class="ghostBtn" id="mkJsonImportBtn">匯入擷取檔 / Apify JSON</button>
         <input type="file" id="mkJsonImportInput" accept=".json" style="display:none;">
         <button class="ghostBtn" id="mkFetchImgBtn" style="display:none;">抓取圖片內容</button>
@@ -409,6 +411,22 @@
         </label>
         <button class="ghostBtn" id="mkGenPromptBtn" style="height:34px; font-size:13px;">手動：產生市場素材 Prompt</button>
         <button class="ghostBtn" id="mkClearTaggedBtn" style="display:none;"></button>
+      </div>
+      <div id="apifyCfg" style="display:none; border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin:10px 0; background:var(--surface);">
+        <p style="font-size:13px; font-weight:600; margin:0 0 8px;">Apify 直連設定 <span id="apifyStatus" class="apiBadge off">未設定</span></p>
+        <p class="sub" style="margin:0 0 8px; font-size:12px;">設定後，工具直接讀取 Apify 上「最近一次成功執行」的結果——不需匯出、下載、選檔。Token 只存在這台瀏覽器。</p>
+        <div class="controls" style="margin-bottom:8px;">
+          <input type="password" id="apifyToken" placeholder="Apify API Token（設定 → Integrations）" style="flex:1; min-width:240px;">
+          <input id="apifyTaskId" placeholder="Task ID 或 使用者名稱~任務名" style="width:230px;">
+          <button class="ghostBtn" id="apifySaveBtn">儲存</button>
+          <button class="ghostBtn" id="apifyTestBtn">測試連線</button>
+          <button class="ghostBtn" id="apifyClearBtn" style="color:var(--coral);">清除</button>
+        </div>
+        <span class="progressText" id="apifyHint" style="margin-top:0;"></span>
+      </div>
+      <div id="apifyProgress" style="display:none; margin-top:10px;">
+        <div class="progTrack"><div class="progBar" id="apifyProgBar"></div></div>
+        <span class="progressText" id="apifyProgText"></span>
       </div>
       <div id="mkAutoProgress" style="display:none; margin-top:10px;">
         <div class="progTrack"><div class="progBar" id="mkProgBar"></div></div>
@@ -2411,18 +2429,137 @@ document.getElementById('mkJsonImportInput').addEventListener('change', e=>{
   reader.readAsText(f);
 });
 
-// ── 遠端圖片抓取（Apify 只給圖片網址，AI 分析需要圖片內容）──
-document.getElementById('mkFetchImgBtn').addEventListener('click', async ()=>{
-  const btn = document.getElementById('mkFetchImgBtn');
-  const hint = document.getElementById('mkFormHint');
+// ══════════════════════════════════════════════════════════
+// Apify 直連：讀取最近一次成功執行的資料集 → 匯入 → 抓圖 → 標籤
+// Token 僅存本機，不進備份/同步；失敗時仍可用手動匯入 JSON
+// ══════════════════════════════════════════════════════════
+LS.apifyToken = 'mt_apify_token';
+LS.apifyTask = 'mt_apify_task';
+function getApifyToken(){ return String(lsGet(LS.apifyToken,'')||'').trim(); }
+function getApifyTask(){ return String(lsGet(LS.apifyTask,'')||'').trim(); }
+function hasApify(){ return !!(getApifyToken() && getApifyTask()); }
+
+function refreshApifyUI(){
+  const on = hasApify();
+  const b = document.getElementById('apifyStatus');
+  b.textContent = on ? '已設定' : '未設定';
+  b.className = 'apiBadge ' + (on ? 'on' : 'off');
+  document.getElementById('apifySyncBtn').style.display = on ? '' : 'none';
+}
+document.getElementById('apifyCfgBtn').addEventListener('click', ()=>{
+  const box = document.getElementById('apifyCfg');
+  const open = box.style.display === 'none';
+  box.style.display = open ? 'block' : 'none';
+  if(open){
+    document.getElementById('apifyToken').value = getApifyToken();
+    document.getElementById('apifyTaskId').value = getApifyTask();
+  }
+});
+document.getElementById('apifySaveBtn').addEventListener('click', ()=>{
+  lsSet(LS.apifyToken, document.getElementById('apifyToken').value.trim());
+  lsSet(LS.apifyTask, document.getElementById('apifyTaskId').value.trim());
+  document.getElementById('apifyHint').textContent = '✓ 已儲存（僅存於本機瀏覽器）';
+  refreshApifyUI();
+});
+document.getElementById('apifyClearBtn').addEventListener('click', ()=>{
+  if(!confirm('清除 Apify Token 與 Task 設定？')) return;
+  lsSet(LS.apifyToken,''); lsSet(LS.apifyTask,'');
+  document.getElementById('apifyToken').value = '';
+  document.getElementById('apifyTaskId').value = '';
+  document.getElementById('apifyHint').textContent = '已清除，將回到手動匯入 JSON 流程';
+  refreshApifyUI();
+});
+async function apifyFetchItems(){
+  const token = getApifyToken(), task = getApifyTask();
+  if(!token || !task) throw new Error('尚未設定 Apify Token 與 Task');
+  // 任務 ID 可能是 abc123 或 username~task-name，兩者皆需編碼
+  const url = `https://api.apify.com/v2/actor-tasks/${encodeURIComponent(task)}/runs/last/dataset/items`
+    + `?token=${encodeURIComponent(token)}&status=SUCCEEDED&clean=true&limit=200`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), 30000);
+  let res;
+  try{
+    res = await fetch(url, { signal: ctrl.signal });
+  }catch(e){
+    clearTimeout(timer);
+    if(e && e.name === 'AbortError') throw new Error('連線逾時（30 秒）');
+    throw new Error('無法連線至 Apify（可能是網路或跨站限制）——可改用「匯入擷取檔 / Apify JSON」手動流程');
+  }
+  clearTimeout(timer);
+  if(res.status === 401 || res.status === 403) throw new Error('Token 無效或無權限存取此任務');
+  if(res.status === 404) throw new Error('找不到該 Task，或該任務尚無成功執行的紀錄');
+  if(!res.ok) throw new Error('Apify 回應錯誤 HTTP ' + res.status);
+  const data = await res.json();
+  if(!Array.isArray(data)) throw new Error('Apify 回傳格式非預期');
+  return data;
+}
+document.getElementById('apifyTestBtn').addEventListener('click', async ()=>{
+  const hint = document.getElementById('apifyHint');
+  lsSet(LS.apifyToken, document.getElementById('apifyToken').value.trim());
+  lsSet(LS.apifyTask, document.getElementById('apifyTaskId').value.trim());
+  hint.textContent = '測試中…';
+  try{
+    const items = await apifyFetchItems();
+    hint.textContent = `✓ 連線成功：最近一次執行有 ${items.length} 筆資料`;
+    refreshApifyUI();
+  }catch(e){ hint.textContent = '✗ ' + e.message; }
+});
+
+// ── 一鍵同步：抓資料 → 匯入 → 抓圖 → 標籤 ──
+document.getElementById('apifySyncBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('apifySyncBtn');
+  const P = (done,total,label)=>setProg('apifyProgBar','apifyProgText','apifyProgress',done,total,label);
+  btn.disabled = true;
+  const t0 = Date.now();
+  try{
+    // 1/4 讀取
+    P(0,4,'1/4 讀取 Apify 最新執行結果…');
+    const raw = await apifyFetchItems();
+    // 2/4 識別與匯入
+    P(1,4,`2/4 識別欄位並匯入（原始 ${raw.length} 筆）…`);
+    const norm = normalizeExternalItems(raw, 'Apify · Google廣告透明中心');
+    const dropped = raw.length - norm.length;
+    const r = mergeMarketItems(norm, 'Apify · Google廣告透明中心');
+    if(!r.added && !marketAll().some(m=>(!m.dataUrl||m.dataUrl==='data:,') && m.imageUrl)){
+      P(4,4,`✓ 完成：無新素材（重複 ${r.skipped} 筆${dropped?`、無圖片 ${dropped} 筆`:''}）`);
+      return;
+    }
+    // 3/4 抓圖（與手動按鈕共用同一份邏輯）
+    const img = await fetchMarketImages((i, total, o, f)=>{
+      P(2 + i/Math.max(1,total), 4, `3/4 抓取圖片 ${i+1}/${total}（成功 ${o}、失敗 ${f}）`);
+    });
+    const ok = img.ok, failed = img.failed;
+    // 4/4 標籤（需 Gemini API）
+    if(hasApi()){
+      const dims = allCrossDims();
+      const pending = marketAll().filter(m=>imgPart(m.dataUrl) && (!m.tags || dims.some(d=>!m.tags[d])));
+      if(pending.length){
+        const tags = await autoTagImages(pending, (d,t)=>P(3+d/t, 4, `4/4 AI 標籤 ${d}/${t}…`), true);
+        const all = marketAll();
+        all.forEach(it=>{ if(tags[it.name]) it.tags = tags[it.name]; });
+        marketSave(all);
+      }
+    }
+    renderMarketList();
+    const secs = ((Date.now()-t0)/1000).toFixed(0);
+    P(4,4, `✓ 完成（${secs} 秒）：新增 ${r.added} 筆、重複 ${r.skipped} 筆`
+      + (dropped ? `、無圖片略過 ${dropped} 筆` : '')
+      + `；圖片成功 ${ok}／失敗 ${failed}`
+      + (hasApi() ? '，已完成 AI 標籤' : '（未設 Gemini API Key，請手動標籤）'));
+  }catch(e){
+    P(0,1,'✗ 失敗：' + e.message);
+  }finally{ btn.disabled = false; }
+});
+
+// 共用：把市場素材的遠端圖片網址抓成圖片內容（供 AI 分析）
+// 逾時 15s、4MB 上限、mime 檢查、300ms 節流、每 5 筆漸進儲存
+async function fetchMarketImages(onProgress){
   const items = marketAll();
   const targets = items.filter(m=>(!m.dataUrl || m.dataUrl==='data:,') && m.imageUrl);
-  if(!targets.length){ btn.style.display='none'; return; }
-  btn.disabled = true;
   let ok = 0, failed = 0;
   for(let i = 0; i < targets.length; i++){
-    hint.textContent = `抓取圖片中… ${i+1}/${targets.length}（成功 ${ok}、失敗 ${failed}）`;
-    if(i > 0) await sleep(300); // 節流：避免瞬間大量請求觸發 CDN 限流
+    if(onProgress) onProgress(i, targets.length, ok, failed);
+    if(i > 0) await sleep(300);
     try{
       const ctrl = new AbortController();
       const timer = setTimeout(()=>ctrl.abort(), 15000);
@@ -2431,26 +2568,37 @@ document.getElementById('mkFetchImgBtn').addEventListener('click', async ()=>{
       if(!res.ok) throw new Error('HTTP ' + res.status);
       const blob = await res.blob();
       if(!/^image\//.test(blob.type) || blob.size > 4*1024*1024) throw new Error('格式或大小不符');
-      const dataUrl = await new Promise((resolve, reject)=>{
+      targets[i].dataUrl = await new Promise((resolve, reject)=>{
         const r = new FileReader();
         r.onload = ()=>resolve(String(r.result));
         r.onerror = ()=>reject(new Error('讀取失敗'));
         r.readAsDataURL(blob);
       });
-      targets[i].dataUrl = dataUrl;
       ok++;
-      // 漸進儲存：每 5 筆落地一次，中途關閉頁面也不會全部白抓
       if(ok % 5 === 0) marketSave(items);
     }catch(e){ failed++; }
   }
   marketSave(items);
+  return { ok, failed, total: targets.length };
+}
+
+// ── 遠端圖片抓取（Apify 只給圖片網址，AI 分析需要圖片內容）──
+document.getElementById('mkFetchImgBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('mkFetchImgBtn');
+  const hint = document.getElementById('mkFormHint');
+  btn.disabled = true;
+  const r = await fetchMarketImages((i, total, ok, failed)=>{
+    hint.textContent = `抓取圖片中… ${i+1}/${total}（成功 ${ok}、失敗 ${failed}）`;
+  });
   renderMarketList();
   btn.disabled = false;
   const remain = marketAll().filter(m=>(!m.dataUrl || m.dataUrl==='data:,') && m.imageUrl).length;
   btn.style.display = remain ? '' : 'none';
-  hint.textContent = `✓ 圖片抓取完成：成功 ${ok} 筆、失敗 ${failed} 筆`
-    + (failed ? '（失敗者為來源網站阻擋跨站讀取，仍可用連結檢視，但無法自動 AI 標籤）' : '')
-    + '。接著可點「⚡ 一鍵標籤市場素材」';
+  hint.textContent = r.total
+    ? `✓ 圖片抓取完成：成功 ${r.ok} 筆、失敗 ${r.failed} 筆`
+      + (r.failed ? '（失敗者為來源網站阻擋跨站讀取，仍可用連結檢視，但無法自動 AI 標籤）' : '')
+      + '。接著可點「⚡ 一鍵標籤市場素材」'
+    : '沒有待抓取的圖片';
 });
 
 // ── 我方 × 市場 特徵分佈對比 ──────────────────────────
@@ -2659,6 +2807,7 @@ renderHypotheses(null);
 renderMarketList();
 renderCustomDims();
 refreshApiUI();
+refreshApifyUI();
 </script>
 </body>
 </html>

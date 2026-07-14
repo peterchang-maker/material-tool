@@ -130,6 +130,11 @@
   .sugChip button{height:24px; font-size:11px; padding:0 8px; border:1px solid var(--teal); border-radius:6px; background:transparent; color:var(--teal); cursor:pointer;}
   .reportBox{border:1px solid var(--border); border-radius:10px; padding:14px 16px; background:var(--surface);}
   .reportBox textarea{width:100%; height:190px; border:1px solid var(--border-strong); border-radius:8px; padding:10px; font-size:13px; line-height:1.7; resize:vertical; font-family:inherit;}
+  .mkItem2{display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border);}
+  .mkItem2 img{width:56px; height:56px; object-fit:cover; border-radius:8px; flex-shrink:0;}
+  .mkTags{display:flex; flex-wrap:wrap; gap:4px; align-items:center;}
+  .featTag.missing{background:var(--coral-bg); color:var(--coral); border-color:var(--coral);}
+  .warnLine{font-size:12px; color:var(--amber); background:var(--amber-bg); border-radius:8px; padding:8px 10px; margin:0 0 8px;}
   .mkItem{display:flex; gap:12px; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:12.5px;}
   .mkItem img{width:56px; height:56px; object-fit:cover; border-radius:8px; flex-shrink:0;}
   .mkMeta{color:var(--text-muted); font-size:11.5px;}
@@ -139,6 +144,17 @@
   .mvBarWrap{display:flex; align-items:center; gap:6px; height:14px; margin:1px 0;}
   .mvBar{height:12px; border-radius:3px;}
   .mvPct{font-size:10.5px; color:var(--text-secondary); white-space:nowrap;}
+  .mvRow2{display:flex; align-items:flex-start; gap:8px; margin-bottom:10px;}
+  .mvLabel2{width:118px; font-size:11.5px; text-align:right; flex-shrink:0; line-height:1.5;}
+  .mvCtr{font-size:11px; margin-top:2px;}
+  .mvNo{color:var(--text-muted);}
+  .qBadge{display:inline-block; font-size:9.5px; padding:1px 5px; border-radius:4px; border:1px solid; margin-left:4px; white-space:nowrap;}
+  .quadBlock{background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:8px;}
+  .quadHead{font-size:13px; font-weight:700; margin-bottom:6px;}
+  .quadAct{font-weight:400; color:var(--text-muted); font-size:12px;}
+  .quadItem{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12.5px; padding:3px 0;}
+  .quadMeta{color:var(--text-secondary); font-size:11.5px;}
+  .quadItem button{height:24px; font-size:11px; padding:0 8px; border:1px solid var(--border-strong); border-radius:6px; background:transparent; cursor:pointer;}
   .gapChip{display:inline-flex; align-items:center; gap:8px; border:1px solid var(--amber); background:var(--amber-bg); border-radius:8px; padding:6px 10px; font-size:12px; color:var(--amber); margin:0 8px 8px 0;}
   .gapChip button{height:24px; font-size:11px; padding:0 8px; border:1px solid var(--amber); border-radius:6px; background:transparent; color:var(--amber); cursor:pointer;}
   .fxGrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:12px; margin-top:12px;}
@@ -380,13 +396,17 @@
         <button class="ghostBtn" id="mkUploadBtn">選擇圖片加入</button>
         <input type="file" id="mkUploadInput" accept="image/*" multiple style="display:none;">
         <button class="ghostBtn" id="mkFormImportBtn">從 Google 表單匯入</button>
-        <button class="ghostBtn" id="mkJsonImportBtn">匯入擷取檔（JSON）</button>
+        <button class="ghostBtn" id="mkJsonImportBtn">匯入擷取檔 / Apify JSON</button>
         <input type="file" id="mkJsonImportInput" accept=".json" style="display:none;">
+        <button class="ghostBtn" id="mkFetchImgBtn" style="display:none;">抓取圖片內容</button>
         <span class="progressText" id="mkFormHint" style="margin-top:0;"></span>
       </div>
       <div id="mkList"><p class="empty">尚無市場素材。填好遊戲名稱與首見日期後選擇圖片加入。</p></div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
         <button class="primaryBtn" id="mkAutoTagBtn" style="height:34px; font-size:13px; display:none;">⚡ 一鍵標籤市場素材</button>
+        <label id="mkRetagWrap" style="display:none; font-size:12px; color:var(--text-secondary); align-items:center; gap:5px;">
+          <input type="checkbox" id="mkRetagAll" style="width:14px; height:14px;">重跑已標籤素材（維度有變動時勾選）
+        </label>
         <button class="ghostBtn" id="mkGenPromptBtn" style="height:34px; font-size:13px;">手動：產生市場素材 Prompt</button>
         <button class="ghostBtn" id="mkClearTaggedBtn" style="display:none;"></button>
       </div>
@@ -406,7 +426,7 @@
 
     <section>
       <h2>我方 × 市場 特徵分佈對比</h2>
-      <p class="sub" style="margin:0 0 12px;">比較的是「特徵出現占比」而非成效（競品成效不可得）。市場端以存活天數加權（上限 120 天，存活越久代表越可能在跑量）；缺口 ≥15 個百分點的特徵會列為建議關注。</p>
+      <p class="sub" style="margin:0 0 12px;">競品成效不可得，因此市場端比的是「特徵出現占比」（以存活天數加權，存活越久代表越可能在跑量）。<b>但我方這端有實際 CTR</b>——工具會把三者交叉，判斷市場愛用的特徵套在我們自己素材上到底有沒有效，直接分出「該加碼」與「別跟風」。</p>
       <div id="mvsWrap"><p class="empty">需要我方 ≥3 支已標籤素材＋市場 ≥3 支已標籤素材，對比會自動出現。</p></div>
       <div id="mvsGaps"></div>
     </section>
@@ -1789,6 +1809,8 @@ function refreshApiUI(){
     const el = document.getElementById(id);
     if(el) el.style.display = on ? '' : 'none';
   });
+  const rw = document.getElementById('mkRetagWrap');
+  if(rw) rw.style.display = on ? 'inline-flex' : 'none';
   const gp = document.getElementById('genPromptBtn');
   if(gp) gp.textContent = on ? '手動：產生分析 Prompt' : '步驟1：產生分析 Prompt（標籤＋洞察一次完成）';
   const aa = document.getElementById('autoAnalyzeBtn');
@@ -1980,8 +2002,16 @@ ${lines}
 // ── 一鍵標籤市場素材 ───────────────────────────────────
 document.getElementById('mkAutoTagBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('mkAutoTagBtn');
-  const pending = marketAll().filter(i=>!i.tags && imgPart(i.dataUrl));
-  if(!pending.length){ alert('沒有待標籤的市場素材（僅連結、無圖片內容者無法自動分析）'); return; }
+  const retag = document.getElementById('mkRetagAll').checked;
+  const dims = allCrossDims();
+  const pending = marketAll().filter(i=>{
+    if(!imgPart(i.dataUrl)) return false;
+    if(!i.tags) return true;
+    if(retag) return true;
+    // 已標籤但缺少當前維度（例如新增自訂維度後）→ 一併補跑
+    return dims.some(d=>i.tags[d]==null || i.tags[d]==='');
+  });
+  if(!pending.length){ alert('沒有需要標籤的市場素材（全部已標籤且維度齊全；僅連結、無圖片內容者無法自動分析）'); return; }
   btn.disabled = true;
   try{
     setProg('mkProgBar', 'mkProgText', 'mkAutoProgress', 0, pending.length, `準備分析 ${pending.length} 張市場素材…`);
@@ -2115,7 +2145,7 @@ function renderCustomDims(){
 }
 function refreshDimViews(){
   if(Object.keys(aiResults).length) renderFeatureCross();
-  renderMarketCompare();
+  renderMarketList(); // 維度變動 → 市場標籤表與缺漏警示需同步（renderMarketList 內會呼叫 renderMarketCompare）
 }
 document.getElementById('cdAddBtn').addEventListener('click', ()=>{
   const name = document.getElementById('cdName').value.trim();
@@ -2139,6 +2169,7 @@ document.getElementById('cdAddBtn').addEventListener('click', ()=>{
 
 // ── 市場素材庫（競品對比） ─────────────────────────────
 LS.market = 'mt_market';
+LS.mkView = 'mt_mk_view';
 function marketAll(){ return lsGet(LS.market, []); }
 function marketSave(arr){ lsSet(LS.market, arr); }
 function survivalDays(firstSeen){
@@ -2148,6 +2179,44 @@ function survivalDays(firstSeen){
   const d = Math.round((Date.now() - ts)/86400000);
   return Math.max(1, Math.min(120, d));
 }
+// 來源格式自動識別：Apify（Google廣告透明中心）/ 書籤擷取檔 / Google 表單
+function djb2(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36); }
+function pick(o, keys){ for(const k of keys){ if(o[k]!=null && o[k]!=='') return o[k]; } return ''; }
+function normalizeExternalItems(list, defaultSource){
+  const out = [];
+  (list||[]).forEach(it=>{
+    if(!it || typeof it!=='object') return;
+    // 已是本工具格式（書籤/表單）→ 原樣通過
+    if(it.imageBase64 !== undefined || (it.id && it.game !== undefined)){ out.push(it); return; }
+
+    // ── Apify 格式自動識別 ──
+    let img = pick(it, ['imageUrl','image','creativeImageUrl','thumbnailUrl','previewImageUrl']);
+    if(!img && Array.isArray(it.imageUrls) && it.imageUrls.length) img = it.imageUrls[0];
+    if(!img && Array.isArray(it.images) && it.images.length) img = (typeof it.images[0]==='string' ? it.images[0] : it.images[0].url) || '';
+    const fmt = String(pick(it, ['adFormat','format','type']) || '').toLowerCase();
+    // 純文字/影片廣告沒有圖片內容，無法做視覺分析 → 略過
+    if(!img || !/^https?:\/\//.test(String(img))) return;
+    if(fmt && /text|video/.test(fmt) && !img) return;
+
+    const game = String(pick(it, ['advertiserName','advertiser','advertiserId','domain']) || '未命名');
+    const rawId = String(pick(it, ['creativeId','adId','id']) || djb2(String(img)));
+    const first = pick(it, ['firstShown','firstShownDate','startDate','firstSeen','lastShown','lastShownDate']);
+    let firstSeen = '';
+    if(first){
+      const d = new Date(first);
+      if(!isNaN(d.getTime())) firstSeen = d.toISOString().slice(0,10);
+    }
+    const id = 'ap' + djb2(rawId + '|' + img);
+    out.push({
+      id, game, source: defaultSource || 'Apify · Google廣告透明中心',
+      firstSeen, name: `市場_${game}_${id}`,
+      imageBase64: '', mime: '', imageUrl: String(img),
+      adUrl: pick(it, ['adUrl','adLibraryUrl','previewUrl']) || null
+    });
+  });
+  return out;
+}
+
 // 外部項目合併收口：所有來源（表單 / 擷取檔）共用同一淨化與去重
 function mergeMarketItems(rawItems, defaultSource){
   const items = marketAll();
@@ -2164,6 +2233,7 @@ function mergeMarketItems(rawItems, defaultSource){
       firstSeen: it.firstSeen || '', addedAt: new Date().toISOString().slice(0,10),
       dataUrl: b64 ? `data:${mime};base64,${b64}` : 'data:,',
       imageUrl: (typeof it.imageUrl==='string' && /^https:\/\//.test(it.imageUrl)) ? it.imageUrl : null,
+      adUrl: (typeof it.adUrl==='string' && /^https:\/\//.test(it.adUrl)) ? it.adUrl : null,
       tags: null
     });
     ids.add(String(it.id));
@@ -2179,23 +2249,65 @@ function renderMarketList(){
   const items = marketAll();
   if(!items.length){ list.innerHTML = '<p class="empty">尚無市場素材。填好遊戲名稱與首見日期後選擇圖片加入。</p>'; return; }
   const tagged = items.filter(i=>i.tags).length;
-  list.innerHTML = `<p style="font-size:12.5px; color:var(--text-secondary); margin:0 0 6px;">共 ${items.length} 支市場素材，已標籤 ${tagged} 支</p>` +
-    items.map((it,i)=>`
-    <div class="mkItem">
-      <img src="${it.dataUrl && it.dataUrl!=='data:,' ? it.dataUrl : (it.imageUrl ? esc(it.imageUrl) : 'data:,')}" referrerpolicy="no-referrer">
-      <div style="flex:1; min-width:0;">
-        <b>${esc(it.game)}</b>　<span class="mkMeta">${esc(it.source)||'-'} · 首見 ${esc(it.firstSeen)||'-'} · 存活 ${survivalDays(it.firstSeen)} 天</span>
-        <div class="mkMeta">${it.tags ? '✓ 已標籤：' + esc([it.tags.訴求類型, it.tags.主色系, it.tags.特效強度].filter(Boolean).join(' · ')) : '待分析'}</div>
-      </div>
-      <button class="ghostBtn" style="height:26px; font-size:11.5px;" onclick="mkDelete(${i})">刪除</button>
-    </div>`).join('');
+  const dims = allCrossDims();
+  const view = lsGet(LS.mkView, 'compact');
+
+  // 標籤完整度：已標籤素材是否涵蓋當前所有維度（新增自訂維度後舊資料會缺）
+  let missing = 0;
+  items.forEach(it=>{ if(it.tags && dims.some(d=>it.tags[d]==null || it.tags[d]==='')) missing++; });
+
+  const head = `
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+      <span style="font-size:12.5px; color:var(--text-secondary);">共 ${items.length} 支市場素材，已標籤 ${tagged} 支（維度標準與我方素材完全相同：${dims.length} 維）</span>
+      <span>
+        <button class="ghostBtn mkViewBtn" data-v="compact" style="height:26px; font-size:11.5px; ${view==='compact'?'border-color:var(--teal); color:var(--teal);':''}">摘要</button>
+        <button class="ghostBtn mkViewBtn" data-v="full" style="height:26px; font-size:11.5px; ${view==='full'?'border-color:var(--teal); color:var(--teal);':''}">完整 ${dims.length} 維</button>
+      </span>
+    </div>
+    ${missing ? `<p class="warnLine">⚠ 有 ${missing} 支素材的標籤缺少部分維度（通常是新增自訂維度後未重跑）——這會讓該維度的市場占比失真。建議點「⚡ 一鍵標籤市場素材」時勾選「重跑已標籤素材」。</p>` : ''}`;
+
+  const body = items.map((it,i)=>{
+    const t = it.tags;
+    const img = it.dataUrl && it.dataUrl!=='data:,' ? it.dataUrl : (it.imageUrl ? esc(it.imageUrl) : 'data:,');
+    const meta = `${esc(it.source)||'-'} · 首見 ${esc(it.firstSeen)||'-'} · 存活 ${survivalDays(it.firstSeen)} 天${it.adUrl ? ` · <a href="${esc(it.adUrl)}" target="_blank" rel="noopener noreferrer">原始廣告↗</a>` : ''}`;
+    let tagHtml;
+    if(!t){
+      tagHtml = '<span style="color:var(--text-muted); font-size:12px;">待分析</span>';
+    }else if(view==='full'){
+      // 完整 18 維（含自訂）：缺漏者標紅，比照我方呈現
+      tagHtml = `<div class="mkTags">` + dims.map(d=>{
+        const v = t[d];
+        return v ? `<span class="featTag">${esc(d)}:${esc(v)}</span>`
+                 : `<span class="featTag missing">${esc(d)}:未標</span>`;
+      }).join('') + `</div>`;
+    }else{
+      const key = ['訴求類型','主色系','特效強度','懷舊元素'].filter(k=>t[k]);
+      tagHtml = `<div class="mkTags">` + key.map(k=>`<span class="featTag">${esc(k)}:${esc(t[k])}</span>`).join('')
+        + `<span style="font-size:11px; color:var(--text-muted); margin-left:4px;">…共 ${dims.filter(d=>t[d]).length}/${dims.length} 維</span></div>`;
+    }
+    return `
+      <div class="mkItem2">
+        <img src="${img}" referrerpolicy="no-referrer">
+        <div style="flex:1; min-width:0;">
+          <p style="margin:0 0 3px; font-size:12.5px;"><b>${esc(it.game)}</b>　<span class="mkMeta">${meta}</span></p>
+          ${tagHtml}
+        </div>
+        <button class="ghostBtn mkDelBtn" data-i="${i}" style="height:26px; font-size:11.5px; flex-shrink:0;">刪除</button>
+      </div>`;
+  }).join('');
+
+  list.innerHTML = head + body;
+  list.querySelectorAll('.mkViewBtn').forEach(b=>b.addEventListener('click', ()=>{
+    lsSet(LS.mkView, b.dataset.v); renderMarketList();
+  }));
+  list.querySelectorAll('.mkDelBtn').forEach(b=>b.addEventListener('click', ()=>mkDelete(+b.dataset.i)));
   renderMarketCompare();
 }
-window.mkDelete = function(i){
+function mkDelete(i){
   const items = marketAll();
   if(!confirm(`刪除市場素材「${items[i]?.game} #${i+1}」？`)) return;
   items.splice(i,1); marketSave(items); renderMarketList();
-};
+}
 document.getElementById('mkUploadBtn').addEventListener('click', ()=>{
   if(!document.getElementById('mkGame').value.trim()){ alert('請先填遊戲名稱'); return; }
   document.getElementById('mkUploadInput').click();
@@ -2282,16 +2394,63 @@ document.getElementById('mkJsonImportInput').addEventListener('change', e=>{
   reader.onload = ev=>{
     try{
       const data = JSON.parse(ev.target.result);
-      const list = Array.isArray(data) ? data : data.items;
-      if(!Array.isArray(list)) throw new Error('找不到 items 陣列');
-      const r = mergeMarketItems(list, data.source || '擷取檔');
-      const noImg = list.filter(it=>it && !it.imageBase64 && it.imageUrl).length;
-      hint.textContent = `✓ 匯入 ${r.added} 筆（略過重複 ${r.skipped} 筆）`
-        + (noImg ? `；其中 ${noImg} 筆以圖片連結顯示（來源網站阻擋跨站讀取時的後備）` : '');
+      const list = Array.isArray(data) ? data : (data.items || data.results);
+      if(!Array.isArray(list)) throw new Error('找不到資料陣列（支援 Apify 匯出、書籤擷取檔、表單格式）');
+      const isApify = list.some(it=>it && it.imageBase64===undefined && (it.advertiserName || it.creativeId || it.adFormat));
+      const norm = normalizeExternalItems(list, data.source || (isApify ? 'Apify · Google廣告透明中心' : '擷取檔'));
+      const dropped = list.length - norm.length;
+      const r = mergeMarketItems(norm, isApify ? 'Apify · Google廣告透明中心' : '擷取檔');
+      const needFetch = marketAll().filter(m=>!m.tags && (!m.dataUrl || m.dataUrl==='data:,') && m.imageUrl).length;
+      hint.textContent = `✓ ${isApify?'已識別 Apify 格式，':''}匯入 ${r.added} 筆（重複 ${r.skipped} 筆`
+        + (dropped>0 ? `、無圖片素材 ${dropped} 筆已略過` : '') + '）'
+        + (needFetch ? `。有 ${needFetch} 筆僅有圖片連結，請點「抓取圖片內容」後才能 AI 標籤` : '');
+      document.getElementById('mkFetchImgBtn').style.display = needFetch ? '' : 'none';
     }catch(err){ hint.textContent = '匯入失敗：' + err.message; }
     e.target.value='';
   };
   reader.readAsText(f);
+});
+
+// ── 遠端圖片抓取（Apify 只給圖片網址，AI 分析需要圖片內容）──
+document.getElementById('mkFetchImgBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('mkFetchImgBtn');
+  const hint = document.getElementById('mkFormHint');
+  const items = marketAll();
+  const targets = items.filter(m=>(!m.dataUrl || m.dataUrl==='data:,') && m.imageUrl);
+  if(!targets.length){ btn.style.display='none'; return; }
+  btn.disabled = true;
+  let ok = 0, failed = 0;
+  for(let i = 0; i < targets.length; i++){
+    hint.textContent = `抓取圖片中… ${i+1}/${targets.length}（成功 ${ok}、失敗 ${failed}）`;
+    if(i > 0) await sleep(300); // 節流：避免瞬間大量請求觸發 CDN 限流
+    try{
+      const ctrl = new AbortController();
+      const timer = setTimeout(()=>ctrl.abort(), 15000);
+      const res = await fetch(targets[i].imageUrl, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const blob = await res.blob();
+      if(!/^image\//.test(blob.type) || blob.size > 4*1024*1024) throw new Error('格式或大小不符');
+      const dataUrl = await new Promise((resolve, reject)=>{
+        const r = new FileReader();
+        r.onload = ()=>resolve(String(r.result));
+        r.onerror = ()=>reject(new Error('讀取失敗'));
+        r.readAsDataURL(blob);
+      });
+      targets[i].dataUrl = dataUrl;
+      ok++;
+      // 漸進儲存：每 5 筆落地一次，中途關閉頁面也不會全部白抓
+      if(ok % 5 === 0) marketSave(items);
+    }catch(e){ failed++; }
+  }
+  marketSave(items);
+  renderMarketList();
+  btn.disabled = false;
+  const remain = marketAll().filter(m=>(!m.dataUrl || m.dataUrl==='data:,') && m.imageUrl).length;
+  btn.style.display = remain ? '' : 'none';
+  hint.textContent = `✓ 圖片抓取完成：成功 ${ok} 筆、失敗 ${failed} 筆`
+    + (failed ? '（失敗者為來源網站阻擋跨站讀取，仍可用連結檢視，但無法自動 AI 標籤）' : '')
+    + '。接著可點「⚡ 一鍵標籤市場素材」';
 });
 
 // ── 我方 × 市場 特徵分佈對比 ──────────────────────────
@@ -2315,42 +2474,109 @@ function distShare(records, weightFn){
 function renderMarketCompare(){
   const wrap = document.getElementById('mvsWrap');
   const gapsEl = document.getElementById('mvsGaps');
-  const own = uploadedImages.filter(i=>aiResults[i.name]).map(i=>({tags: aiResults[i.name], w:1}));
+  // 我方：需同時有標籤（才知道特徵）與成效（才知道有沒有效）
+  const ownTagged = uploadedImages.filter(i=>aiResults[i.name]);
+  const ownPerf = ownTagged.filter(i=>i.matchedRow);
+  const own = ownTagged.map(i=>({tags: aiResults[i.name], w:1}));
   const mkt = marketAll().filter(i=>i.tags).map(i=>({tags: i.tags, w: survivalDays(i.firstSeen)}));
   if(own.length<3 || mkt.length<3){
     wrap.innerHTML = `<p class="empty">需要我方 ≥3 支已標籤素材（目前 ${own.length}）＋市場 ≥3 支（目前 ${mkt.length}），對比會自動出現。</p>`;
     gapsEl.innerHTML=''; return;
   }
   const dOwn = distShare(own), dMkt = distShare(mkt);
-  const gaps = [];
+  const thr = getImprThreshold();
+
+  // 我方整體加權 CTR（成效基準線）
+  const totC = ownPerf.reduce((s,i)=>s+(i.matchedRow.點擊||0),0);
+  const totI = ownPerf.reduce((s,i)=>s+(i.matchedRow.曝光||0),0);
+  const overall = totI ? totC/totI : 0;
+
+  // 每個特徵值：我方實際加權 CTR
+  function ownCtr(dim, key){
+    const hit = ownPerf.filter(i=>{
+      let v = aiResults[i.name][dim];
+      if(v==null) return false;
+      return String(v).replace(/\s*[（(]不確定[)）]\s*/g,'').trim() === key;
+    });
+    if(!hit.length) return null;
+    const c = hit.reduce((s,i)=>s+(i.matchedRow.點擊||0),0);
+    const im = hit.reduce((s,i)=>s+(i.matchedRow.曝光||0),0);
+    return im ? { ctr: c/im, n: hit.length, impr: im, low: im < thr } : null;
+  }
+
+  // 四象限判定
+  const QUAD = {
+    chase:  { label:'錯失的機會', color:'var(--teal)',  bg:'var(--teal-bg)',  act:'立刻加碼' },
+    trap:   { label:'市場的陷阱', color:'var(--coral)', bg:'var(--coral-bg)', act:'不要跟風' },
+    moat:   { label:'我們的優勢', color:'var(--teal)',  bg:'var(--teal-bg)',  act:'守住並放大' },
+    cut:    { label:'該砍的慣性', color:'var(--amber)', bg:'var(--amber-bg)', act:'考慮停損' },
+    untest: { label:'尚未驗證',   color:'var(--text-muted)', bg:'#f1efe9',    act:'轉為假設測試' },
+  };
+  const findings = [];
+
   const cards = allCrossDims().map(dim=>{
     const o = dOwn[dim]||{}, m = dMkt[dim]||{};
     const keys = [...new Set([...Object.keys(o), ...Object.keys(m)])];
-    if(keys.length<1) return '';
+    if(!keys.length) return '';
     keys.sort((a,b)=>(m[b]||0)-(m[a]||0));
     const rows = keys.slice(0,5).map(k=>{
-      const op = o[k]||0, mp = m[k]||0, gap = mp-op;
-      if(gap>=15 && mp>=25) gaps.push({dim, key:k, own:op, mkt:mp});
+      const op = o[k]||0, mp = m[k]||0;
+      const oc = ownCtr(dim, k);
+      // 我方 CTR 相對整體的差異
+      let lift = null, liftTxt = '<span class="mvNo">我方無此素材</span>';
+      if(oc){
+        lift = overall>0 ? (oc.ctr-overall)/overall*100 : 0;
+        const col = oc.low ? 'var(--text-muted)' : (lift>=10 ? 'var(--teal)' : lift<=-10 ? 'var(--coral)' : 'var(--text-secondary)');
+        liftTxt = `<span style="color:${col}; font-weight:600;">我方 CTR ${(oc.ctr*100).toFixed(2)}%（${lift>=0?'+':''}${lift.toFixed(0)}%）</span>`
+          + (oc.low ? '<span class="warnBadge">樣本不足</span>' : '');
+      }
+      // 象限判定（僅在市場或我方占比夠明顯時才判）
+      let q = null;
+      const mktHigh = mp>=25, ownLow = op<mp-15, ownHigh = op>=25 && op>mp+15;
+      if(oc && !oc.low){
+        if(mktHigh && ownLow) q = lift>=10 ? 'chase' : (lift<=-10 ? 'trap' : null);
+        else if(ownHigh && !mktHigh) q = lift>=10 ? 'moat' : (lift<=-10 ? 'cut' : null);
+      }else if(mktHigh && ownLow && !oc){
+        q = 'untest';
+      }
+      if(q) findings.push({dim, key:k, own:op, mkt:mp, ctr: oc?oc.ctr:null, lift, q, n: oc?oc.n:0});
+      const badge = q ? `<span class="qBadge" style="color:${QUAD[q].color}; background:${QUAD[q].bg}; border-color:${QUAD[q].color};">${QUAD[q].label}</span>` : '';
       return `
-        <div class="mvRow">
-          <div class="mvLabel" title="${esc(k)}">${esc(k)}</div>
+        <div class="mvRow2">
+          <div class="mvLabel2" title="${esc(k)}">${esc(k)}${badge}</div>
           <div class="mvPair">
             <div class="mvBarWrap"><div class="mvBar" style="width:${Math.max(1,op).toFixed(0)}%; background:#1d9e75;"></div><span class="mvPct">我方 ${op.toFixed(0)}%</span></div>
             <div class="mvBarWrap"><div class="mvBar" style="width:${Math.max(1,mp).toFixed(0)}%; background:#5b7bb5;"></div><span class="mvPct">市場 ${mp.toFixed(0)}%</span></div>
+            <div class="mvCtr">${liftTxt}</div>
           </div>
         </div>`;
     }).join('');
     return `<div class="fxCard"><div class="fxDim">${esc(dim)}</div>${rows}</div>`;
   }).filter(Boolean).join('');
+
   wrap.innerHTML = `
-    <p style="font-size:12.5px; color:var(--text-secondary); margin:0 0 10px;">我方 ${own.length} 支 vs 市場 ${mkt.length} 支（存活天數加權）　<span style="color:#1d9e75;">■ 我方</span>　<span style="color:#5b7bb5;">■ 市場</span></p>
+    <p style="font-size:12.5px; color:var(--text-secondary); margin:0 0 4px;">我方 ${own.length} 支（其中 ${ownPerf.length} 支有成效資料）vs 市場 ${mkt.length} 支（存活天數加權）　<span style="color:#1d9e75;">■ 我方占比</span>　<span style="color:#5b7bb5;">■ 市場占比</span>　我方整體加權 CTR ${(overall*100).toFixed(2)}%</p>
+    <p class="sub" style="margin:0 0 10px;">第三欄是關鍵：市場愛用的特徵，套在<b>我們自己的素材</b>上實際成效如何——決定該加碼還是別跟風。</p>
     <div class="fxGrid">${cards}</div>`;
-  gapsEl.innerHTML = gaps.length ? `
-    <h3 style="font-size:14px; margin:16px 0 8px;">建議關注的缺口（市場高頻、我方少用）</h3>
-    ${gaps.sort((a,b)=>(b.mkt-b.own)-(a.mkt-a.own)).slice(0,6).map((g,i)=>`
-      <span class="gapChip">${esc(g.dim)}＝${esc(g.key)}：市場 ${g.mkt.toFixed(0)}% vs 我方 ${g.own.toFixed(0)}%
-        <button class="gapBtn" data-key="${esc(g.key)}" data-dim="${esc(g.dim)}">＋轉為假設</button></span>`).join('')}
-    <p class="sub" style="margin:6px 0 0;">市場高頻不代表對我們有效——轉為假設後，由下一波自家投放數據裁決。</p>` : '';
+
+  // ── 決策清單：依象限分組 ──
+  const order = ['chase','moat','trap','cut','untest'];
+  const grouped = order.map(q=>({ q, items: findings.filter(f=>f.q===q) })).filter(g=>g.items.length);
+  gapsEl.innerHTML = grouped.length ? `
+    <h3 style="font-size:14px; margin:16px 0 4px;">決策矩陣：市場在做什麼 × 我們在做什麼 × 我們做了有沒有效</h3>
+    <p class="sub" style="margin:0 0 10px;">占比差異 ≥15 個百分點且我方 CTR 高／低於整體 10% 以上才會列入；樣本不足者不判定。</p>
+    ${grouped.map(g=>{
+      const Q = QUAD[g.q];
+      return `<div class="quadBlock" style="border-left:4px solid ${Q.color};">
+        <div class="quadHead" style="color:${Q.color};">${Q.label}　<span class="quadAct">→ ${Q.act}</span></div>
+        ${g.items.sort((a,b)=>Math.abs(b.lift||0)-Math.abs(a.lift||0)).map((f,i)=>`
+          <div class="quadItem">
+            <b>${esc(f.dim)}＝${esc(f.key)}</b>
+            <span class="quadMeta">市場 ${f.mkt.toFixed(0)}% · 我方 ${f.own.toFixed(0)}%${f.ctr!=null ? ` · 我方 CTR ${(f.ctr*100).toFixed(2)}%（${f.lift>=0?'+':''}${f.lift.toFixed(0)}%，${f.n} 支）` : ' · 我方尚無此類素材'}</span>
+            ${f.q==='untest' ? `<button class="gapBtn" data-key="${esc(f.key)}" data-dim="${esc(f.dim)}">＋轉為假設</button>` : ''}
+          </div>`).join('')}
+      </div>`;
+    }).join('')}` : '<p class="sub" style="margin-top:12px;">尚無足夠證據形成決策建議（需要占比差異明顯、且我方有對應素材的成效資料）。</p>';
   gapsEl.querySelectorAll('.gapBtn').forEach(btn=>{
     btn.addEventListener('click', ()=>gapToHypo(btn.dataset.key, btn.dataset.dim));
   });

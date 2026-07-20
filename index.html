@@ -608,7 +608,7 @@ function handleFile(file){
   reader.onload = e=>{
     rawBuffer = e.target.result; // 保存原始buffer供圖片解析用
     try{
-      workbook = XLSX.read(e.target.result, {type:'array'});
+      workbook = XLSX.read(e.target.result, {type:'array', cellDates:true});
     }catch(err){
       errArea.innerHTML = `<div class="errBox">無法讀取檔案，請確認是有效的 Excel 檔案。</div>`;
       return;
@@ -617,8 +617,20 @@ function handleFile(file){
     uploadBox.style.display='none';
     fileBar.style.display='flex';
 
-    const candidates = workbook.SheetNames.filter(n=>n.includes('素材分析') || n.includes('成效'));
-    const sheetNames = candidates.length ? candidates.concat(workbook.SheetNames.filter(n=>!candidates.includes(n))) : workbook.SheetNames;
+    // 探測每個分頁是否含可解析標頭（素材名稱 或 投放渠道+素材主題），可解析者排前
+    const probe = n => {
+      try{
+        const rs = XLSX.utils.sheet_to_json(workbook.Sheets[n], {header:1, defval:null});
+        for(let i=0;i<Math.min(rs.length,20);i++){
+          const cells = (rs[i]||[]).map(c=>String(c||'').trim());
+          if(cells.some(c=>c.includes('素材名稱'))) return true;
+          if(cells.includes('投放渠道') && cells.includes('素材主題')) return true;
+        }
+      }catch(e){}
+      return false;
+    };
+    const parsable = workbook.SheetNames.filter(probe);
+    const sheetNames = parsable.length ? parsable.concat(workbook.SheetNames.filter(n=>!parsable.includes(n))) : workbook.SheetNames;
     sheetSelect.innerHTML = sheetNames.map(n=>`<option>${n}</option>`).join('');
     sheetRow.style.display='flex';
     parseSheet(sheetSelect.value);
@@ -657,64 +669,137 @@ function parseSheet(sheetName){
   if(!ws){ errArea.innerHTML = `<div class="errBox">找不到分頁「${sheetName}」。</div>`; return; }
   const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
 
-  // 找出標頭列（含「素材名稱」欄位的那一列）
-  let headerIdx = -1;
+  // 找出標頭列：支援兩種格式
+  //  A. 舊格式：一欄「素材名稱」（五段式命名字串）
+  //  B. 新格式：欄位拆開（投放渠道／活動目標／素材格式／訴求／素材主題）
+  let headerIdx = -1, mode = null;
   for(let i=0;i<Math.min(rows.length,20);i++){
-    if(rows[i] && rows[i].some(c=>String(c||'').includes('素材名稱'))){
-      headerIdx = i; break;
-    }
+    const cells = (rows[i]||[]).map(c=>String(c||'').trim());
+    if(cells.some(c=>c.includes('素材名稱'))){ headerIdx = i; mode = 'name'; break; }
+    if(cells.includes('投放渠道') && cells.includes('素材主題')){ headerIdx = i; mode = 'columns'; break; }
   }
   if(headerIdx===-1){
-    errArea.innerHTML = `<div class="errBox">這個分頁找不到「素材名稱」欄位，請確認格式或改選其他分頁。</div>`;
+    errArea.innerHTML = `<div class="errBox">這個分頁找不到可解析的標頭（需要「素材名稱」欄，或「投放渠道＋素材主題」的欄位式格式），請改選其他分頁。</div>`;
     dashboard.style.display='none';
     return;
   }
 
   const header = rows[headerIdx].map(h=>String(h||'').trim());
   const colIdx = key => header.findIndex(h=>h.includes(key));
-  const idx = {
-    channel: colIdx('渠道名稱'),
-    name: colIdx('素材名稱'),
-    cost: colIdx('費用'),
-    conv: colIdx('預約次數'),
-    cpa: header.findIndex(h=>h==='CPA'),
-    click: colIdx('點擊'),
-    ctr: header.findIndex(h=>h.toUpperCase()==='CTR'),
-    impr: colIdx('曝光'),
-    cpm: header.findIndex(h=>h.toUpperCase()==='CPM'),
-  };
-  if(idx.name===-1 || idx.click===-1 || idx.impr===-1){
-    errArea.innerHTML = `<div class="errBox">欄位不完整，至少需要「素材名稱」「點擊」「曝光」。</div>`;
-    dashboard.style.display='none';
-    return;
-  }
-
-  let currentChannel = null;
+  const exact = key => header.findIndex(h=>h===key);
   const out = [];
-  for(let i=headerIdx+1; i<rows.length; i++){
-    const r = rows[i];
-    if(!r) continue;
-    const ch = idx.channel>=0 ? r[idx.channel] : null;
-    if(ch) currentChannel = ch;
-    const nameVal = r[idx.name];
-    if(!nameVal) continue;
-    if(String(nameVal).includes('導入表現') || String(nameVal).includes('說明')) break;
-    const click = r[idx.click];
-    const impr = r[idx.impr];
-    if(typeof click !== 'number' || typeof impr !== 'number') continue;
 
-    const parsed = parseMaterialName(nameVal);
-    out.push({
-      渠道: currentChannel,
-      ...parsed,
-      費用: cleanMoney(idx.cost>=0 ? r[idx.cost] : null),
-      預約次數: idx.conv>=0 ? r[idx.conv] : null,
-      CPA: cleanMoney(idx.cpa>=0 ? r[idx.cpa] : null),
-      點擊: click,
-      CTR: idx.ctr>=0 ? r[idx.ctr] : (click && impr ? click/impr : null),
-      曝光: impr,
-      CPM: idx.cpm>=0 ? cleanMoney(r[idx.cpm]) : null,
-    });
+  if(mode === 'columns'){
+    // ── 新格式：欄位拆開，直接讀欄不需拆字串 ──
+    const ci = {
+      ch: exact('投放渠道'), goal: exact('活動目標'), fmt: exact('素材格式'),
+      appeal: exact('訴求'), theme: exact('素材主題'),
+      d0: colIdx('走期起'), d1: colIdx('走期迄'),
+      cost: colIdx('花費金額')>=0 ? colIdx('花費金額') : colIdx('費用'),
+      impr: exact('曝光')>=0 ? exact('曝光') : colIdx('曝光'),
+      click: exact('點擊')>=0 ? exact('點擊') : colIdx('點擊'),
+      conv: colIdx('預約次數'),
+      inst: colIdx('安裝次數'),          // 改版期以安裝為轉換
+      ctr: header.findIndex(h=>h.toUpperCase()==='CTR'),
+    };
+    if(ci.theme===-1 || ci.click===-1 || ci.impr===-1){
+      errArea.innerHTML = `<div class="errBox">欄位不完整，至少需要「素材主題」「點擊」「曝光」。</div>`;
+      dashboard.style.display='none';
+      return;
+    }
+    const mmdd = v => {
+      if(v==null) return null;
+      let d;
+      if(v instanceof Date) d = v;
+      else if(typeof v === 'number'){          // Excel 序號日期（epoch 1899-12-30）
+        d = new Date(Date.UTC(1899, 11, 30) + v * 86400000);
+      }else d = new Date(v);
+      if(isNaN(d.getTime())) return null;
+      return ('0'+(d.getUTCMonth()+1)).slice(-2) + ('0'+d.getUTCDate()).slice(-2);
+    };
+    let curD0 = null, curD1 = null;   // 走期常只填在首列，往下沿用
+    for(let i=headerIdx+1; i<rows.length; i++){
+      const r = rows[i];
+      if(!r) continue;
+      let theme = r[ci.theme];
+      if(theme == null || theme === '') continue;
+      if(typeof theme === 'number') theme = String(theme);   // 純數字主題（如年份）也要收
+      if(typeof theme !== 'string') continue;
+      theme = theme.trim();
+      if(!theme) continue;
+      const click = r[ci.click], impr = r[ci.impr];
+      if(typeof click !== 'number' || typeof impr !== 'number') continue;
+      if(ci.d0>=0 && r[ci.d0]!=null) curD0 = mmdd(r[ci.d0]);
+      if(ci.d1>=0 && r[ci.d1]!=null) curD1 = mmdd(r[ci.d1]);
+      const ch = ci.ch>=0 ? String(r[ci.ch]||'').trim() : '';
+      const goal = ci.goal>=0 ? String(r[ci.goal]||'').trim() : '';
+      const fmt = ci.fmt>=0 ? String(r[ci.fmt]||'').trim() : null;
+      const appeal = ci.appeal>=0 ? String(r[ci.appeal]||'').trim() : null;
+      const conv = (ci.conv>=0 && typeof r[ci.conv]==='number') ? r[ci.conv]
+                 : (ci.inst>=0 && typeof r[ci.inst]==='number') ? r[ci.inst] : null;
+      const cost = cleanMoney(ci.cost>=0 ? r[ci.cost] : null);
+      out.push({
+        渠道: (goal ? goal+'型' : '') + ch,            // 例：成效型Meta（沿用舊渠道命名，情境切換不變）
+        格式: fmt || null,
+        視覺類型: null,                                  // 新格式無此欄
+        素材切角: appeal || null,
+        賣點: theme,
+        走期: (curD0 && curD1) ? `${curD0}-${curD1}` : null,
+        命名完整: !!(fmt && appeal && theme),            // 欄位式本身即結構，齊備即合格
+        素材名稱: [fmt, appeal, theme].filter(Boolean).join('_'),
+        費用: cost,
+        預約次數: conv,
+        CPA: (cost!=null && conv) ? cost/conv : null,
+        點擊: click,
+        CTR: (ci.ctr>=0 && typeof r[ci.ctr]==='number') ? r[ci.ctr] : (impr ? click/impr : null),
+        曝光: impr,
+        CPM: (cost!=null && impr) ? cost/impr*1000 : null,
+      });
+    }
+  }else{
+    // ── 舊格式：一欄五段式素材名稱 ──
+    const idx = {
+      channel: colIdx('渠道名稱'),
+      name: colIdx('素材名稱'),
+      cost: colIdx('費用'),
+      conv: colIdx('預約次數'),
+      cpa: exact('CPA'),
+      click: colIdx('點擊'),
+      ctr: header.findIndex(h=>h.toUpperCase()==='CTR'),
+      impr: colIdx('曝光'),
+      cpm: header.findIndex(h=>h.toUpperCase()==='CPM'),
+    };
+    if(idx.name===-1 || idx.click===-1 || idx.impr===-1){
+      errArea.innerHTML = `<div class="errBox">欄位不完整，至少需要「素材名稱」「點擊」「曝光」。</div>`;
+      dashboard.style.display='none';
+      return;
+    }
+    let currentChannel = null;
+    for(let i=headerIdx+1; i<rows.length; i++){
+      const r = rows[i];
+      if(!r) continue;
+      const ch = idx.channel>=0 ? r[idx.channel] : null;
+      if(ch) currentChannel = ch;
+      const nameVal = r[idx.name];
+      if(!nameVal) continue;
+      if(String(nameVal).includes('導入表現') || String(nameVal).includes('說明')) break;
+      const click = r[idx.click];
+      const impr = r[idx.impr];
+      if(typeof click !== 'number' || typeof impr !== 'number') continue;
+
+      const parsed = parseMaterialName(nameVal);
+      out.push({
+        渠道: currentChannel,
+        ...parsed,
+        費用: cleanMoney(idx.cost>=0 ? r[idx.cost] : null),
+        預約次數: idx.conv>=0 ? r[idx.conv] : null,
+        CPA: cleanMoney(idx.cpa>=0 ? r[idx.cpa] : null),
+        點擊: click,
+        CTR: idx.ctr>=0 ? r[idx.ctr] : (click && impr ? click/impr : null),
+        曝光: impr,
+        CPM: idx.cpm>=0 ? cleanMoney(r[idx.cpm]) : null,
+      });
+    }
   }
 
   if(!out.length){

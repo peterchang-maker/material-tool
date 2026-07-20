@@ -120,6 +120,7 @@
   .histItem .meta{color:var(--text-muted); font-size:11.5px;}
   .histItem button{height:26px; font-size:11.5px; padding:0 10px;}
   /* 特徵交叉驗證與素材對比 */
+  .gsheetRow{display:flex; align-items:center; gap:12px; margin:10px 0;}
   .restoreHint{font-size:12px; color:var(--teal); background:var(--teal-bg); border-radius:8px; padding:8px 12px; margin:0 0 12px;}
   .apifySub{border-top:1px solid var(--border); padding-top:10px; margin-top:10px;}
   .apifySubT{font-size:12.5px; font-weight:600; margin:0 0 8px;}
@@ -201,6 +202,11 @@
     <p class="main">點擊或拖曳 Excel 檔案到這裡（.xlsx）</p>
     <p class="hint">需包含欄位：各渠道名稱／素材名稱／費用／預約次數／CPA／點擊／CTR／曝光／CPM</p>
     <input type="file" id="fileInput" accept=".xlsx,.xls">
+  </div>
+
+  <div class="gsheetRow" id="gsheetRow">
+    <button class="ghostBtn" id="gsheetLoadBtn">☁ 從 Google Sheet 讀取</button>
+    <span class="progressText" id="gsheetHint" style="margin-top:0;"></span>
   </div>
 
   <div class="fileBar" id="fileBar" style="display:none;">
@@ -551,6 +557,8 @@
 <script>
 let angleChartInst=null, angleCpaChartInst=null, spChartInst=null;
 let sortKey='點擊', sortDir=-1;
+let RAW=[]; // 解析後的素材資料
+let workbook=null; // 目前的 Excel/線上 workbook
 let rawBuffer=null; // 儲存原始 ArrayBuffer 供圖片解析使用
 let imageMap={}; // rowIndex(0-based) -> {dataUrl}
 const uploadBox = document.getElementById('uploadBox');
@@ -573,7 +581,7 @@ fileInput.addEventListener('change', e=>{
   if(e.target.files.length) handleFile(e.target.files[0]);
 });
 document.getElementById('resetBtn').addEventListener('click', ()=>{
-  workbook=null; RAW=[]; rawBuffer=null; imageMap={};
+  workbook=null; RAW=[]; rawBuffer=null; imageMap={}; gsheetData=null;
   lsSet(LS.own, null);
   uploadedImages.forEach(i=>idbDel('own:'+i.name).catch(()=>{}));
   uploadedImages=[]; aiResults={};
@@ -638,7 +646,67 @@ function handleFile(file){
   reader.readAsArrayBuffer(file);
 }
 
-sheetSelect.addEventListener('change', ()=>parseSheet(sheetSelect.value));
+// ── 從 Google Sheet 讀取（透過 GAS materialSheets 端點）──
+// 分頁名可每次不同，GAS 自動掃描可解析分頁，工具端列成下拉選單
+let gsheetData = null;   // { sheets:[{name,mode,rows}], activeSheet, rowsByName:{} }
+async function loadFromGSheet(sheetName){
+  const url = (lsGet(LS.settings, {}).gasUrl || '').trim();
+  const hint = document.getElementById('gsheetHint');
+  if(!url){
+    hint.textContent = '請先到下方「歷史庫與資料備份」填入 Google Apps Script 網址';
+    hint.style.color = 'var(--coral)';
+    return;
+  }
+  hint.style.color = 'var(--text-secondary)';
+  hint.textContent = '讀取中…';
+  try{
+    const q = url + (url.includes('?')?'&':'?') + 'action=materialSheets'
+      + (sheetName ? '&sheet=' + encodeURIComponent(sheetName) : '');
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 30000);
+    const res = await fetch(q, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error || '讀取失敗');
+    if(!json.sheets || !json.sheets.length) throw new Error('試算表中找不到可解析的素材分頁');
+    if(!Array.isArray(json.data)) throw new Error('回傳資料格式不符');
+
+    // 用回傳的 aoa 建一個記憶體 workbook，交給既有 parseSheet 流程
+    const active = json.activeSheet;
+    const ws = XLSX.utils.aoa_to_sheet(json.data);
+    const wb = { SheetNames:[active], Sheets:{ [active]: ws } };
+    workbook = wb;
+    rawBuffer = null;   // 線上讀取無原始 buffer（Excel 內嵌圖擷取不適用，改用市場素材庫或手動上傳圖）
+
+    // 下拉選單列出所有可解析分頁（含目前這個），供切換
+    gsheetData = json;
+    const names = json.sheets.map(s=>s.name);
+    sheetSelect.innerHTML = names.map(n=>`<option ${n===active?'selected':''}>${esc(n)}</option>`).join('');
+    sheetRow.style.display = 'flex';
+    fileName.textContent = '☁ Google Sheet · ' + active;
+    uploadBox.style.display = 'none';
+    fileBar.style.display = 'flex';
+
+    parseSheet(active);
+    const other = json.sheets.length - 1;
+    hint.textContent = `✓ 已讀取「${active}」`
+      + (other>0 ? `，另有 ${other} 個分頁可從上方切換` : '')
+      + '。Excel 內嵌圖片擷取不適用線上讀取，素材圖請用市場素材庫或手動上傳。';
+  }catch(e){
+    hint.style.color = 'var(--coral)';
+    hint.textContent = e.name==='AbortError' ? '讀取逾時，請確認網路與 GAS 部署狀態' : ('讀取失敗：' + e.message);
+  }
+}
+document.getElementById('gsheetLoadBtn').addEventListener('click', ()=>loadFromGSheet());
+// 統一的分頁切換：線上來源走 GAS 重新讀取，本地檔案走 parseSheet
+sheetSelect.addEventListener('change', ()=>{
+  if(gsheetData && fileName.textContent.startsWith('☁')){
+    loadFromGSheet(sheetSelect.value);
+  }else{
+    parseSheet(sheetSelect.value);
+  }
+});
 
 function cleanMoney(x){
   if(x==null) return null;

@@ -120,6 +120,20 @@
   .histItem .meta{color:var(--text-muted); font-size:11.5px;}
   .histItem button{height:26px; font-size:11.5px; padding:0 10px;}
   /* 特徵交叉驗證與素材對比 */
+  .metricBar{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px;}
+  .kpiGrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;}
+  .kpiCard{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px;}
+  .kpiCard .k{font-size:12px; color:var(--text-muted); margin-bottom:4px;}
+  .kpiCard .v{font-size:22px; font-weight:700; color:var(--text); letter-spacing:-.02em;}
+  .kpiCard .s{font-size:11px; color:var(--text-muted); margin-top:3px;}
+  .kpiCard.hi{background:#e9f4f1; border-color:#0f6e56;}
+  .kpiCard.hi .v{color:#0f6e56;}
+  .metricBtn{padding:5px 13px; font-size:12.5px; border:1px solid var(--border); background:#fff;
+    border-radius:14px; cursor:pointer; color:var(--text-secondary); transition:.15s;}
+  .metricBtn:hover{border-color:var(--accent); color:var(--accent);}
+  .metricBtn.on{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600;}
+  #angleTable td, #spTable td{white-space:nowrap;}
+  .numCell{text-align:right; font-variant-numeric:tabular-nums;}
   .gsheetRow{display:flex; align-items:center; gap:12px; margin:10px 0;}
   .restoreHint{font-size:12px; color:var(--teal); background:var(--teal-bg); border-radius:8px; padding:8px 12px; margin:0 0 12px;}
   .apifySub{border-top:1px solid var(--border); padding-top:10px; margin-top:10px;}
@@ -247,18 +261,46 @@
     </div>
     <p class="sub" id="contextHint" style="margin:-4px 0 18px;"></p>
 
+    <section id="kpiSection" style="display:none;">
+      <h2>整體成效總覽</h2>
+      <p class="sub" id="kpiScopeHint" style="margin:-6px 0 12px;">本次分析的全部關鍵指標，一次看完</p>
+      <div class="kpiGrid" id="kpiGrid"></div>
+    </section>
+
     <section>
       <h2>依素材切角彙總成效</h2>
+      <p class="sub" style="margin:-6px 0 8px;">點下方指標可切換圖表：CTR、CPA、CPM、CPC、轉換數、CVR、花費</p>
+      <div class="metricBar" id="angleMetricBar"></div>
       <div class="chart-row">
         <div><canvas id="angleChart"></canvas></div>
         <div><canvas id="angleCpaChart"></canvas></div>
+      </div>
+      <div class="table-scroll" style="margin-top:14px;">
+        <table id="angleTable">
+          <thead><tr>
+            <th>切角</th><th>素材數</th><th>花費</th><th>曝光</th><th>點擊</th>
+            <th>CTR</th><th>CPC</th><th>CPM</th><th class="convCol">轉換</th><th>CPA</th><th>CVR</th>
+          </tr></thead>
+          <tbody id="angleTableBody"></tbody>
+        </table>
       </div>
       <div id="angleInsights" style="margin-top:16px;"></div>
     </section>
 
     <section>
-      <h2>依賣點彙總 CTR</h2>
+      <h2>依賣點彙總成效</h2>
+      <p class="sub" style="margin:-6px 0 8px;">點下方指標可切換圖表；表格則一次列出所有指標</p>
+      <div class="metricBar" id="spMetricBar"></div>
       <canvas id="sellingPointChart" style="max-height:340px;"></canvas>
+      <div class="table-scroll" style="margin-top:14px;">
+        <table id="spTable">
+          <thead><tr>
+            <th>賣點</th><th>素材數</th><th>花費</th><th>曝光</th><th>點擊</th>
+            <th>CTR</th><th>CPC</th><th>CPM</th><th class="convCol">轉換</th><th>CPA</th><th>CVR</th>
+          </tr></thead>
+          <tbody id="spTableBody"></tbody>
+        </table>
+      </div>
     </section>
 
     <section>
@@ -538,8 +580,10 @@
       <p class="sub" style="margin:0 0 12px;">分析結果存在這台瀏覽器的 localStorage。請定期匯出 JSON 備份——換電腦、清快取都會遺失資料。也可設定 Google Apps Script 端點，把歷史庫同步到共用試算表。</p>
       <div class="controls" style="margin-bottom:6px;">
         <button class="ghostBtn" id="exportJsonBtn">匯出歷史庫（JSON）</button>
+        <button class="ghostBtn" id="exportFullBtn" style="color:var(--gold);">📦 匯出完整包（含素材圖）</button>
         <button class="ghostBtn" id="importJsonBtn">匯入 JSON 備份</button>
         <input type="file" id="importJsonInput" accept=".json" style="display:none;">
+        <span class="progressText" id="exportFullHint" style="margin-top:0;"></span>
       </div>
       <div class="controls" style="margin-bottom:14px;">
         <input id="gasUrlInput" placeholder="Google Apps Script Web App URL（選填）" style="flex:1; min-width:260px;">
@@ -770,6 +814,8 @@ function parseSheet(sheetName){
       inst: colIdx('安裝次數'),          // 改版期以安裝為轉換
       ctr: header.findIndex(h=>h.toUpperCase()==='CTR'),
     };
+    // 記錄轉換欄位的實際名稱（事前預約 / 安裝），供圖表與表頭顯示
+    CONV_LABEL = (ci.conv>=0) ? '事前預約' : (ci.inst>=0 ? '安裝' : '轉換');
     if(ci.theme===-1 || ci.click===-1 || ci.impr===-1){
       errArea.innerHTML = `<div class="errBox">欄位不完整，至少需要「素材主題」「點擊」「曝光」。</div>`;
       dashboard.style.display='none';
@@ -837,6 +883,7 @@ function parseSheet(sheetName){
       impr: colIdx('曝光'),
       cpm: header.findIndex(h=>h.toUpperCase()==='CPM'),
     };
+    CONV_LABEL = (idx.conv>=0) ? '事前預約' : '轉換';
     if(idx.name===-1 || idx.click===-1 || idx.impr===-1){
       errArea.innerHTML = `<div class="errBox">欄位不完整，至少需要「素材名稱」「點擊」「曝光」。</div>`;
       dashboard.style.display='none';
@@ -911,15 +958,210 @@ function aggBy(field, rows){
   const g = {};
   rows.forEach(d=>{
     const key = d[field] || '未分類';
-    g[key] = g[key] || {click:0, impr:0, cost:0, conv:0};
+    g[key] = g[key] || {click:0, impr:0, cost:0, conv:0, n:0};
     g[key].click += d.點擊 || 0;
     g[key].impr += d.曝光 || 0;
     g[key].cost += d.費用 || 0;
     g[key].conv += (typeof d.預約次數 === 'number' ? d.預約次數 : 0);
+    g[key].n++;
   });
   return Object.entries(g).map(([k,v])=>({
-    key:k, ctr: v.impr ? v.click/v.impr : 0, cpa: v.conv ? v.cost/v.conv : null, click:v.click, impr:v.impr
+    key:k,
+    ctr: v.impr ? v.click/v.impr : 0,
+    cpa: v.conv ? v.cost/v.conv : null,
+    cpm: v.impr ? v.cost/v.impr*1000 : null,
+    cpc: v.click ? v.cost/v.click : null,
+    cvr: v.click ? v.conv/v.click : 0,
+    click:v.click, impr:v.impr, cost:v.cost, conv:v.conv, n:v.n
   }));
+}
+
+// ── 指標定義：一處定義，切角與賣點圖表共用 ─────────────
+// convLabel 會依資料實際欄位動態調整（事前預約 / 安裝）
+const METRICS = {
+  ctr:  { label:'CTR',    unit:'%',  get:d=>d.ctr==null?null:+(d.ctr*100).toFixed(2), better:'high', fmt:v=>v+'%' },
+  cpa:  { label:'CPA',    unit:'元', get:d=>d.cpa==null?null:+d.cpa.toFixed(1),       better:'low',  fmt:v=>'$'+v },
+  cpm:  { label:'CPM',    unit:'元', get:d=>d.cpm==null?null:+d.cpm.toFixed(1),       better:'low',  fmt:v=>'$'+v },
+  cpc:  { label:'CPC',    unit:'元', get:d=>d.cpc==null?null:+d.cpc.toFixed(2),       better:'low',  fmt:v=>'$'+v },
+  conv: { label:'轉換數',  unit:'',   get:d=>d.conv||0,                                 better:'high', fmt:v=>v.toLocaleString() },
+  cvr:  { label:'CVR',    unit:'%',  get:d=>+(d.cvr*100).toFixed(2),                   better:'high', fmt:v=>v+'%' },
+  cost: { label:'花費',    unit:'元', get:d=>Math.round(d.cost||0),                     better:'', fmt:v=>'$'+v.toLocaleString() },
+};
+// 目前資料的轉換欄位名稱（事前預約 / 安裝），用於圖表標題
+let CONV_LABEL = '轉換';
+function convFieldLabel(){ return CONV_LABEL; }
+
+// ══════════ 多指標彙總圖表 ══════════
+const ANGLE_METRICS = ['ctr','cpa','cpm','cpc','conv','cvr','cost'];
+const SP_METRICS    = ['ctr','cpa','cpm','cpc','conv','cvr','cost'];
+let ANGLE_AGG = [], SP_AGG = [], SP_AVG_CTR = 0;
+let ANGLE_M1 = 'ctr';   // 切角左圖指標（右圖固定顯示 CPA 作對照）
+let SP_M = 'ctr';       // 賣點圖指標
+
+function metricLabel(k){
+  const m = METRICS[k];
+  if(!m) return k;
+  return (k==='conv' || k==='cpa' || k==='cvr') ? m.label.replace('轉換', convFieldLabel()) : m.label;
+}
+// 指標切換列
+function renderMetricBar(elId, keys, onPick){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  const cur = elId==='angleMetricBar' ? ANGLE_M1 : SP_M;
+  el.innerHTML = keys.map(k=>
+    `<button class="metricBtn${k===cur?' on':''}" data-m="${esc(k)}">${esc(metricLabel(k))}</button>`
+  ).join('');
+  el.querySelectorAll('.metricBtn').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      el.querySelectorAll('.metricBtn').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+      onPick(b.dataset.m);
+    });
+  });
+}
+// 依指標排序（越好的排前面）
+function sortAggBy(arr, mKey){
+  const m = METRICS[mKey];
+  const val = d => { const v = m.get(d); return (v==null || isNaN(v)) ? (m.better==='low' ? Infinity : -Infinity) : v; };
+  return [...arr].sort((a,b)=> m.better==='low' ? val(a)-val(b) : val(b)-val(a));
+}
+function drawAngleCharts(){
+  const m = METRICS[ANGLE_M1];
+  const data = sortAggBy(ANGLE_AGG, ANGLE_M1);
+  const vals = data.map(d=>{ const v=m.get(d); return (v==null||isNaN(v))?0:v; });
+  if(angleChartInst) angleChartInst.destroy();
+  angleChartInst = new Chart(document.getElementById('angleChart'), {
+    type:'bar',
+    data:{ labels:data.map(d=>d.key), datasets:[{label:metricLabel(ANGLE_M1), data:vals, backgroundColor:'#1d9e75'}] },
+    options:{ plugins:{title:{display:true,text:`${metricLabel(ANGLE_M1)} 依素材切角`,font:{size:12}}, legend:{display:false},
+      tooltip:{callbacks:{label:c=>`${metricLabel(ANGLE_M1)}: ${m.fmt(c.parsed.y)}`,
+        afterLabel:c=>{ const d=data[c.dataIndex]; return `素材 ${d.n} 支・曝光 ${d.impr.toLocaleString()}`; }}}},
+      scales:{y:{ticks:{callback:v=>m.fmt(v)}}} }
+  });
+  // 右圖＝對照指標：成效面看左圖時右圖給成本面，反之亦然，避免兩張圖講同一件事
+  const PAIR = { ctr:'cpa', cvr:'cpa', conv:'cpa', cost:'conv', cpa:'conv', cpm:'ctr', cpc:'ctr' };
+  const rk = PAIR[ANGLE_M1] || 'cpa';
+  const rm = METRICS[rk];
+  const rdata = sortAggBy(ANGLE_AGG, ANGLE_M1);
+  const rvals = rdata.map(d=>{ const v=rm.get(d); return (v==null||isNaN(v))?0:v; });
+  if(angleCpaChartInst) angleCpaChartInst.destroy();
+  angleCpaChartInst = new Chart(document.getElementById('angleCpaChart'), {
+    type:'bar',
+    data:{ labels:rdata.map(d=>d.key), datasets:[{label:metricLabel(rk), data:rvals, backgroundColor:'#d85a30'}] },
+    options:{ plugins:{title:{display:true,text:`${metricLabel(rk)} 依素材切角（對照）`,font:{size:12}}, legend:{display:false},
+      tooltip:{callbacks:{label:c=>`${metricLabel(rk)}: ${rm.fmt(c.parsed.y)}`}}},
+      scales:{y:{ticks:{callback:v=>rm.fmt(v)}}} }
+  });
+}
+// ══════════ 整體成效總覽（所有關鍵指標一次呈現）══════════
+// 用意：預設不再只看 CTR，切角/賣點/成本/轉換各面向同時可見。
+function renderKpiOverview(rows, scopeLabel, allCount){
+  const el = document.getElementById('kpiGrid');
+  const sec = document.getElementById('kpiSection');
+  if(!el || !sec) return;
+  if(!rows || !rows.length){ sec.style.display='none'; return; }
+  const hint = document.getElementById('kpiScopeHint');
+  if(hint){
+    const scoped = (allCount!=null && allCount!==rows.length);
+    hint.textContent = scoped
+      ? `目前範圍：${scopeLabel||'當前情境'}（${rows.length} / ${allCount} 筆素材）。切換上方情境可看其他渠道。`
+      : `本次分析的全部關鍵指標（共 ${rows.length} 筆素材），一次看完。`;
+  }
+
+  const sum = (f)=>rows.reduce((s,r)=>s+(Number(r[f])||0),0);
+  const cost = sum('費用'), impr = sum('曝光'), clk = sum('點擊'), conv = sum('預約次數');
+  const ctr  = impr ? clk/impr : null;
+  const cpc  = clk ? cost/clk : null;
+  const cpm  = impr ? cost/impr*1000 : null;
+  const cpa  = conv ? cost/conv : null;
+  const cvr  = clk ? conv/clk : null;
+  // 切角 / 賣點的涵蓋度：讓使用者知道拆解得夠不夠細
+  const angles = new Set(rows.map(r=>r.素材切角).filter(Boolean));
+  const points = new Set(rows.map(r=>r.賣點).filter(Boolean));
+
+  const money = v => v==null ? '—' : '$' + Math.round(v).toLocaleString();
+  const money2= v => v==null ? '—' : '$' + v.toFixed(1);
+  const pct   = v => v==null ? '—' : (v*100).toFixed(2) + '%';
+  const num   = v => (v==null||isNaN(v)) ? '—' : Math.round(v).toLocaleString();
+  const convName = convFieldLabel();
+
+  const cards = [
+    { k:'素材數',        v:num(rows.length),  s:`${angles.size} 種切角・${points.size} 個賣點` },
+    { k:'總花費',        v:money(cost),       s:'' },
+    { k:'曝光',          v:num(impr),         s:'' },
+    { k:'點擊',          v:num(clk),          s:'' },
+    { k:'CTR',           v:pct(ctr),          s:'點擊 ÷ 曝光', hi:true },
+    { k:'CPC',           v:money2(cpc),       s:'每次點擊成本' },
+    { k:'CPM',           v:money2(cpm),       s:'每千次曝光成本', hi:true },
+    { k:convName,        v:num(conv),         s:'總轉換數', hi:true },
+    { k:'CPA',           v:money2(cpa),       s:`每次${convName}成本`, hi:true },
+    { k:'CVR',           v:pct(cvr),          s:`${convName} ÷ 點擊` },
+  ];
+  el.innerHTML = cards.map(c=>
+    `<div class="kpiCard${c.hi?' hi':''}">
+       <p class="k">${esc(c.k)}</p>
+       <p class="v">${esc(c.v)}</p>
+       ${c.s?`<p class="s">${esc(c.s)}</p>`:''}
+     </div>`
+  ).join('');
+  sec.style.display='';
+}
+
+function drawSpChart(){
+  const m = METRICS[SP_M];
+  const thr = getImprThreshold();
+  const data = sortAggBy(SP_AGG, SP_M);
+  const vals = data.map(d=>{ const v=m.get(d); return (v==null||isNaN(v))?0:v; });
+  // 好壞著色：高好者以平均為界，低好者以中位數為界
+  const nums = vals.filter(v=>v>0).slice().sort((a,b)=>a-b);
+  const mid = nums.length ? nums[Math.floor(nums.length/2)] : 0;
+  const good = '#1d9e75', bad = '#f0997b', grey = '#c7c2b4';
+  const colors = data.map((d,i)=>{
+    if(d.impr < thr) return grey;
+    if(!m.better) return '#5b7bb5';
+    const v = vals[i];
+    if(m.better==='high') return v >= (SP_M==='ctr' ? SP_AVG_CTR*100 : mid) ? good : bad;
+    return v <= mid ? good : bad;
+  });
+  if(spChartInst) spChartInst.destroy();
+  spChartInst = new Chart(document.getElementById('sellingPointChart'), {
+    type:'bar',
+    data:{ labels:data.map(d=> d.impr < thr ? d.key + ' ⚠' : d.key),
+      datasets:[{label:metricLabel(SP_M), data:vals, backgroundColor:colors}] },
+    options:{ indexAxis:'y', plugins:{legend:{display:false},
+      title:{display:true,text:`${metricLabel(SP_M)} 依賣點`,font:{size:12}},
+      tooltip:{callbacks:{
+        label:c=>`${metricLabel(SP_M)}: ${m.fmt(c.parsed.x)}`,
+        afterLabel:c=>{ const d=data[c.dataIndex];
+          const base = `素材 ${d.n} 支・曝光 ${d.impr.toLocaleString()}`;
+          return d.impr<thr ? base + `（低於門檻 ${thr.toLocaleString()}，僅供參考）` : base; }}}},
+      scales:{x:{ticks:{callback:v=>m.fmt(v)}}} }
+  });
+}
+// 彙總明細表（所有指標一次看）
+function renderAggTable(bodyId, agg){
+  const el = document.getElementById(bodyId);
+  if(!el) return;
+  // 表頭的「轉換」欄改成實際名稱（事前預約 / 安裝）
+  document.querySelectorAll('.convCol').forEach(th=>{ th.textContent = convFieldLabel(); });
+  const thr = getImprThreshold();
+  const f = (v,fmt)=> (v==null||isNaN(v)) ? '—' : fmt(v);
+  el.innerHTML = agg.map(d=>{
+    const low = d.impr < thr;
+    return `<tr${low?' style="opacity:.62;"':''}>
+      <td>${esc(d.key)}${low?' <span title="低於樣本門檻">⚠</span>':''}</td>
+      <td class="numCell">${d.n}</td>
+      <td class="numCell">${fmtMoney(d.cost)}</td>
+      <td class="numCell">${(d.impr||0).toLocaleString()}</td>
+      <td class="numCell">${(d.click||0).toLocaleString()}</td>
+      <td class="numCell">${fmtPct(d.ctr)}</td>
+      <td class="numCell">${f(d.cpc, v=>'$'+v.toFixed(2))}</td>
+      <td class="numCell">${f(d.cpm, v=>'$'+v.toFixed(1))}</td>
+      <td class="numCell">${(d.conv||0).toLocaleString()}</td>
+      <td class="numCell">${f(d.cpa, v=>'$'+v.toFixed(1))}</td>
+      <td class="numCell">${fmtPct(d.cvr)}</td>
+    </tr>`;
+  }).join('');
 }
 
 function tagClass(angle){
@@ -1147,19 +1389,14 @@ function renderAll(){
     <div class="card"><p class="label">表現最佳切角 <span style="font-size:10px; color:var(--text-muted);">CTR+CPA綜合</span></p><p class="value">${esc(bestAngleKey)}</p><p style="font-size:11px; color:var(--text-muted); margin:4px 0 0;">${bestAngleHint}</p></div>
   `;
 
-  if(angleChartInst) angleChartInst.destroy();
-  angleChartInst = new Chart(document.getElementById('angleChart'), {
-    type:'bar',
-    data:{ labels: angleAgg.map(d=>d.key), datasets:[{label:'CTR', data: angleAgg.map(d=>+(d.ctr*100).toFixed(2)), backgroundColor:'#1d9e75'}] },
-    options:{ plugins:{title:{display:true,text:'CTR（%）依素材切角',font:{size:12}}, legend:{display:false}}, scales:{y:{ticks:{callback:v=>v+'%'}}} }
-  });
+  // 整體 KPI 總覽：所有指標一次呈現（不再只強調 CTR）
+  renderKpiOverview(perfData, ctxLabel, RAW.length);
 
-  if(angleCpaChartInst) angleCpaChartInst.destroy();
-  angleCpaChartInst = new Chart(document.getElementById('angleCpaChart'), {
-    type:'bar',
-    data:{ labels: angleAgg.map(d=>d.key), datasets:[{label:'平均CPA', data: angleAgg.map(d=>d.cpa?+d.cpa.toFixed(1):0), backgroundColor:'#d85a30'}] },
-    options:{ plugins:{title:{display:true,text:'平均 CPA（元）依素材切角',font:{size:12}}, legend:{display:false}} }
-  });
+  // 切角：雙圖 + 可切換指標
+  ANGLE_AGG = angleAgg;
+  renderMetricBar('angleMetricBar', ANGLE_METRICS, k=>{ ANGLE_M1 = k; drawAngleCharts(); });
+  drawAngleCharts();
+  renderAggTable('angleTableBody', angleAgg);
 
   const insightsEl = document.getElementById('angleInsights');
   if(angleWithScore.length>=2){
@@ -1172,20 +1409,12 @@ function renderAll(){
     insightsEl.innerHTML = '';
   }
 
-  const spAgg = aggBy('賣點', perfData).sort((a,b)=>b.ctr-a.ctr);
-  const thr = getImprThreshold();
-  if(spChartInst) spChartInst.destroy();
-  spChartInst = new Chart(document.getElementById('sellingPointChart'), {
-    type:'bar',
-    data:{
-      labels: spAgg.map(d=> d.impr < thr ? d.key + ' ⚠' : d.key),
-      datasets:[{label:'CTR', data: spAgg.map(d=>+(d.ctr*100).toFixed(2)),
-        backgroundColor: spAgg.map(d=> d.impr < thr ? '#c7c2b4' : (d.ctr>=avgCTR ? '#1d9e75' : '#f0997b'))}]
-    },
-    options:{ indexAxis:'y', plugins:{legend:{display:false},
-      tooltip:{callbacks:{afterLabel:(c)=>{ const d=spAgg[c.dataIndex]; return d.impr<thr ? `曝光 ${d.impr.toLocaleString()}（低於門檻 ${thr.toLocaleString()}，數據僅供參考）` : `曝光 ${d.impr.toLocaleString()}`; }}}},
-      scales:{x:{ticks:{callback:v=>v+'%'}}} }
-  });
+  // 賣點：可切換指標
+  SP_AGG = aggBy('賣點', perfData);
+  SP_AVG_CTR = avgCTR;
+  renderMetricBar('spMetricBar', SP_METRICS, k=>{ SP_M = k; drawSpChart(); renderAggTable('spTableBody', sortAggBy(SP_AGG, SP_M)); });
+  drawSpChart();
+  renderAggTable('spTableBody', sortAggBy(SP_AGG, SP_M));
 
   const channelSel = document.getElementById('filterChannel');
   const angleSel = document.getElementById('filterAngle');
@@ -1196,7 +1425,7 @@ function renderAll(){
   renderTable();
   renderCycleChart(perfData);
   renderHypotheses(perfData);
-  window.__lastPerfSnapshot = { perfData, avgCTR, totalCost, angleWithScore, spAgg, ctxLabel };
+  window.__lastPerfSnapshot = { perfData, avgCTR, totalCost, angleWithScore, spAgg: sortAggBy(SP_AGG,'ctr'), ctxLabel };
 }
 
 function renderTable(){
@@ -1940,6 +2169,71 @@ document.getElementById('saveHistoryBtn').addEventListener('click', ()=>{
   renderHistory();
   alert('已儲存到歷史庫。提醒：localStorage 綁定這台瀏覽器，請定期匯出 JSON 備份。');
 });
+// ── 匯出完整包（含市場素材圖片）──────────────────────
+// 圖片存在 IndexedDB，這裡取出、壓縮後嵌入 JSON，讓同事匯入後能直接看到圖。
+// 壓縮參數：最長邊 640px、JPEG 0.7 —— 足夠辨識視覺特徵，檔案不致過大。
+document.getElementById('exportFullBtn').addEventListener('click', async ()=>{
+  const hint = document.getElementById('exportFullHint');
+  const btn = document.getElementById('exportFullBtn');
+  saveSettings();
+  const mkt = marketAll();
+  const total = mkt.length;
+  btn.disabled = true;
+  hint.style.color = 'var(--text-secondary)';
+  hint.textContent = total ? `打包中… (0/${total})` : '打包中…';
+  try{
+    const packed = [];
+    let done = 0, withImg = 0, skipped = 0;
+    for(const m of mkt){
+      const o = Object.assign({}, m);
+      delete o.dataUrl;
+      let img = (m.dataUrl && m.dataUrl.startsWith('data:image/')) ? m.dataUrl : null;
+      if(!img){
+        try{ const d = await idbGet(m.id); if(d && String(d).startsWith('data:image/')) img = d; }catch(e){}
+      }
+      if(img){
+        try{
+          const small = await shrinkImage(img, 640, 0.7);
+          o.imgData = small;
+          withImg++;
+        }catch(e){ skipped++; }
+      }else{ skipped++; }
+      packed.push(o);
+      done++;
+      if(done % 3 === 0 || done === total) hint.textContent = `打包中… (${done}/${total})`;
+      if(done % 12 === 0) await new Promise(r=>setTimeout(r, 0));   // 讓畫面有機會更新
+    }
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      version: 2,
+      withImages: true,
+      history: lsGet(LS.history, []),
+      hypotheses: lsGet(LS.hypo, []),
+      market: packed,
+      customDims: lsGet(LS.customDims, []),
+      settings: lsGet(LS.settings, {})
+    };
+    const json = JSON.stringify(payload);
+    const mb = json.length / 1048576;
+    const blob = new Blob([json], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `素材分析完整包_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 3000);
+    hint.style.color = 'var(--gold)';
+    hint.textContent = `✓ 已匯出完整包：${withImg} 張素材圖`
+      + (skipped ? `、${skipped} 筆無圖` : '')
+      + `　檔案約 ${mb.toFixed(1)} MB`
+      + (mb > 25 ? '（偏大，傳送前可先在市場素材庫「清理圖片」減量）' : '');
+  }catch(e){
+    hint.style.color = 'var(--coral)';
+    hint.textContent = '匯出失敗：' + e.message;
+  }finally{
+    btn.disabled = false;
+  }
+});
+
 document.getElementById('exportJsonBtn').addEventListener('click', ()=>{
   saveSettings(); // 先把當前 UI 上的設定寫入，避免未失焦的修改漏掉
   const payload = {
@@ -1978,9 +2272,24 @@ document.getElementById('importJsonInput').addEventListener('change', e=>{
       if(Array.isArray(data.market)){
         const curM = lsGet(LS.market, []);
         const mids = new Set(curM.map(m=>m.id));
-        data.market.forEach(m=>{ if(m.id && !mids.has(m.id)) curM.push(m); });
+        let imgRestored = 0;
+        data.market.forEach(m=>{
+          if(!m.id || mids.has(m.id)) return;
+          const meta = Object.assign({}, m);
+          const img = meta.imgData;            // 完整包才有：壓縮過的素材圖
+          delete meta.imgData;                 // localStorage 只存中繼資料
+          curM.push(meta);
+          mids.add(m.id);
+          if(img && String(img).startsWith('data:image/')){
+            idbSet(m.id, img).catch(()=>{});   // 圖片還原進 IndexedDB
+            imgRestored++;
+          }
+        });
         lsSet(LS.market, curM);
-        renderMarketList();
+        window.__importedImgCount = imgRestored;
+        // 圖片寫入是非同步的，稍候重新載入市場庫讓圖顯示出來
+        if(imgRestored) setTimeout(()=>{ initMarket(); }, 300);
+        else renderMarketList();
       }
       if(Array.isArray(data.customDims)){
         const curD = lsGet(LS.customDims, []);
@@ -1992,7 +2301,11 @@ document.getElementById('importJsonInput').addEventListener('change', e=>{
       if(data.settings && typeof data.settings==='object'){ lsSet(LS.settings, Object.assign(lsGet(LS.settings, {}), data.settings)); loadSettings(); }
       renderHistory();
       renderHypotheses(window.__lastPerfSnapshot ? window.__lastPerfSnapshot.perfData : null);
-      alert(`匯入完成：歷史紀錄 ${cur.length} 筆、假設 ${curH.length} 條（已自動去重合併）`);
+      const imgN = window.__importedImgCount || 0;
+      alert(`匯入完成：歷史紀錄 ${cur.length} 筆、假設 ${curH.length} 條`
+        + (imgN ? `、素材圖 ${imgN} 張` : '')
+        + `（已自動去重合併）`);
+      window.__importedImgCount = 0;
     }catch(err){ alert('匯入失敗：不是有效的備份 JSON 檔'); }
     e.target.value='';
   };
@@ -2489,7 +2802,12 @@ function idbTx(mode, fn){
     const store = tx.objectStore(IDB_STORE);
     let out;
     try{ out = fn(store); }catch(e){ reject(e); return; }
-    tx.oncomplete = ()=>resolve(out && out.result !== undefined ? out.result : out);
+    // 取值型交易（get）：沒有資料時回傳 undefined，不要把 IDBRequest 物件漏出去
+    // （曾導致「匯入無圖備份後 dataUrl 變成 [object IDBRequest]」的破圖問題）
+    tx.oncomplete = ()=>{
+      if(out && typeof out === 'object' && 'result' in out) return resolve(out.result);
+      resolve(out);
+    };
     tx.onerror = ()=>reject(tx.error);
   }));
 }

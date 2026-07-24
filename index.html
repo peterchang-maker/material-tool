@@ -121,6 +121,10 @@
   .histItem button{height:26px; font-size:11.5px; padding:0 10px;}
   /* 特徵交叉驗證與素材對比 */
   .metricBar{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px;}
+  .needApi{opacity:.5; cursor:not-allowed; position:relative;}
+  .needApi::after{content:"需 API Key"; position:absolute; top:-8px; right:-6px; font-size:9.5px;
+    background:var(--amber-bg,#faf2e2); color:var(--amber,#92640c); border:1px solid var(--amber,#92640c);
+    border-radius:6px; padding:1px 5px; white-space:nowrap; line-height:1.4;}
   .dailyGrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px;}
   .dailyBox{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px;}
   .dailyBoxT{margin:0 0 10px; font-size:14px; font-weight:700; color:var(--text);}
@@ -266,7 +270,7 @@
       <div class="sep"></div>
       <button class="ghostBtn" id="saveHistoryBtn">儲存本次分析到歷史庫</button>
       <button class="ghostBtn" id="exportCardBtn">匯出週報圖卡（PNG）</button>
-      <button class="ghostBtn" id="aiReportBtn" style="display:none;">⚡ AI 撰寫週報文字</button>
+      <button class="ghostBtn" id="aiReportBtn">⚡ AI 撰寫週報文字</button>
     </div>
 
     <div class="sheetRow" style="margin-bottom:8px;">
@@ -396,13 +400,13 @@
           <input id="cdName" placeholder="維度名稱，例：季節氛圍" style="width:170px;">
           <input id="cdHint" placeholder="選項提示，例：春節或夏日或萬聖節或無" style="flex:1; min-width:220px;">
           <button class="ghostBtn" id="cdAddBtn">新增維度</button>
-          <button class="ghostBtn" id="cdSuggestBtn" style="display:none;">⚡ AI 提議維度</button>
+          <button class="ghostBtn" id="cdSuggestBtn">⚡ AI 提議維度</button>
         </div>
         <div id="cdSuggestWrap" style="margin-bottom:8px;"></div>
         <div id="cdList"></div>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-        <button class="primaryBtn" id="autoAnalyzeBtn" disabled style="display:none;">⚡ 一鍵 AI 分析（自動標籤＋洞察）</button>
+        <button class="primaryBtn" id="autoAnalyzeBtn" disabled>⚡ 一鍵 AI 分析（自動標籤＋洞察）</button>
         <button class="ghostBtn" id="genPromptBtn" disabled>手動：產生分析 Prompt</button>
         <span class="progressText" id="genPromptHint"></span>
       </div>
@@ -485,7 +489,7 @@
       </div>
       <div id="mkList"><p class="empty">尚無市場素材。填好遊戲名稱與首見日期後選擇圖片加入。</p></div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
-        <button class="primaryBtn" id="mkAutoTagBtn" style="height:34px; font-size:13px; display:none;">⚡ 一鍵標籤市場素材</button>
+        <button class="primaryBtn" id="mkAutoTagBtn" style="height:34px; font-size:13px;">⚡ 一鍵標籤市場素材</button>
         <label id="mkRetagWrap" style="display:none; font-size:12px; color:var(--text-secondary); align-items:center; gap:5px;">
           <input type="checkbox" id="mkRetagAll" style="width:14px; height:14px;">重跑已標籤素材（維度有變動時勾選）
         </label>
@@ -2569,17 +2573,44 @@ function refreshApiUI(){
   const badge = document.getElementById('apiStatus');
   badge.textContent = on ? `已啟用（${getApiModel()}）` : '未設定';
   badge.className = 'apiBadge ' + (on ? 'on' : 'off');
+  // AI 按鈕：一律顯示（讓使用者知道有這些功能），未設定 API Key 時停用並提示
+  // —— 過去是直接隱藏，導致「功能突然不見」的困惑。
   ['autoAnalyzeBtn','mkAutoTagBtn','cdSuggestBtn','aiReportBtn'].forEach(id=>{
     const el = document.getElementById(id);
-    if(el) el.style.display = on ? '' : 'none';
+    if(!el) return;
+    el.style.display = '';
+    el.classList.toggle('needApi', !on);
+    el.title = on ? '' : '需要先設定 Gemini API Key（在「AI 視覺特徵分析」區）';
   });
   const rw = document.getElementById('mkRetagWrap');
   if(rw) rw.style.display = on ? 'inline-flex' : 'none';
   const gp = document.getElementById('genPromptBtn');
   if(gp) gp.textContent = on ? '手動：產生分析 Prompt' : '步驟1：產生分析 Prompt（標籤＋洞察一次完成）';
   const aa = document.getElementById('autoAnalyzeBtn');
-  if(aa) aa.disabled = uploadedImages.length === 0;
+  // 一鍵分析另有「要有圖片」的條件，兩者皆須滿足才可按
+  if(aa) aa.disabled = !on || uploadedImages.length === 0;
+  ['mkAutoTagBtn','cdSuggestBtn','aiReportBtn'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.disabled = !on;
+  });
 }
+// 未設定 API Key 時點 AI 按鈕：引導到設定區（disabled 按鈕收不到 click，
+// 因此監聽外層容器的點擊事件來偵測）
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest && e.target.closest('.needApi');
+  if(!btn) return;
+  const box = document.getElementById('apiConfig');
+  if(box && box.style.display === 'none'){
+    box.style.display = '';
+    const t = document.getElementById('apiToggleBtn');
+    if(t) t.textContent = '收起 API 設定';
+  }
+  const sec = document.getElementById('apiConfig') || document.getElementById('apiToggleBtn');
+  if(sec && sec.scrollIntoView) sec.scrollIntoView({behavior:'smooth', block:'center'});
+  const inp = document.getElementById('apiKeyInput');
+  if(inp) setTimeout(()=>inp.focus(), 400);
+}, true);
+
 document.getElementById('apiToggleBtn').addEventListener('click', ()=>{
   const box = document.getElementById('apiConfig');
   const open = box.style.display === 'none';

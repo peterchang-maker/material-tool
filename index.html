@@ -279,7 +279,7 @@
         <table id="angleTable">
           <thead><tr>
             <th>切角</th><th>素材數</th><th>花費</th><th>曝光</th><th>點擊</th>
-            <th>CTR</th><th>CPC</th><th>CPM</th><th class="convCol">轉換</th><th>CPA</th><th>CVR</th>
+            <th>CTR</th><th>CPC</th><th>CPM</th><th class="convCol">轉換</th><th>CPA</th><th>CVR</th><th class="instCol" style="display:none;">下載數</th><th class="cpiCol" style="display:none;">CPI</th>
           </tr></thead>
           <tbody id="angleTableBody"></tbody>
         </table>
@@ -296,7 +296,7 @@
         <table id="spTable">
           <thead><tr>
             <th>賣點</th><th>素材數</th><th>花費</th><th>曝光</th><th>點擊</th>
-            <th>CTR</th><th>CPC</th><th>CPM</th><th class="convCol">轉換</th><th>CPA</th><th>CVR</th>
+            <th>CTR</th><th>CPC</th><th>CPM</th><th class="convCol">轉換</th><th>CPA</th><th>CVR</th><th class="instCol" style="display:none;">下載數</th><th class="cpiCol" style="display:none;">CPI</th>
           </tr></thead>
           <tbody id="spTableBody"></tbody>
         </table>
@@ -596,7 +596,7 @@
 </div>
 
 <!-- 週報圖卡模板（隱藏，匯出時渲染） -->
-<div id="reportCard" style="position:fixed; left:-9999px; top:0; width:1080px; background:#0E1526; color:#F2EDE3; font-family:'Microsoft JhengHei','PingFang TC',sans-serif; padding:48px 56px; box-sizing:border-box;"></div>
+<div id="reportCard" style="position:absolute; left:-9999px; top:0; width:1080px; background:#0E1526; color:#F2EDE3; font-family:'Microsoft JhengHei','PingFang TC',sans-serif; padding:48px 56px; box-sizing:border-box;"></div>
 
 <script>
 let angleChartInst=null, angleCpaChartInst=null, spChartInst=null;
@@ -849,8 +849,10 @@ function parseSheet(sheetName){
       const goal = ci.goal>=0 ? String(r[ci.goal]||'').trim() : '';
       const fmt = ci.fmt>=0 ? String(r[ci.fmt]||'').trim() : null;
       const appeal = ci.appeal>=0 ? String(r[ci.appeal]||'').trim() : null;
-      const conv = (ci.conv>=0 && typeof r[ci.conv]==='number') ? r[ci.conv]
-                 : (ci.inst>=0 && typeof r[ci.inst]==='number') ? r[ci.inst] : null;
+      const convRaw = (ci.conv>=0 && typeof r[ci.conv]==='number') ? r[ci.conv] : null;
+      const instRaw = (ci.inst>=0 && typeof r[ci.inst]==='number') ? r[ci.inst] : null;
+      // 主轉換：有預約用預約，否則用安裝（維持既有邏輯）
+      const conv = (convRaw!=null) ? convRaw : instRaw;
       const cost = cleanMoney(ci.cost>=0 ? r[ci.cost] : null);
       out.push({
         渠道: (goal ? goal+'型' : '') + ch,            // 例：成效型Meta（沿用舊渠道命名，情境切換不變）
@@ -863,7 +865,9 @@ function parseSheet(sheetName){
         素材名稱: [fmt, appeal, theme].filter(Boolean).join('_'),
         費用: cost,
         預約次數: conv,
+        安裝次數: instRaw,                                 // 獨立保留，供下載數 / CPI 計算
         CPA: (cost!=null && conv) ? cost/conv : null,
+        CPI: (cost!=null && instRaw) ? cost/instRaw : null,
         點擊: click,
         CTR: (ci.ctr>=0 && typeof r[ci.ctr]==='number') ? r[ci.ctr] : (impr ? click/impr : null),
         曝光: impr,
@@ -877,6 +881,7 @@ function parseSheet(sheetName){
       name: colIdx('素材名稱'),
       cost: colIdx('費用'),
       conv: colIdx('預約次數'),
+      inst: colIdx('安裝次數')>=0 ? colIdx('安裝次數') : colIdx('下載次數'),
       cpa: exact('CPA'),
       click: colIdx('點擊'),
       ctr: header.findIndex(h=>h.toUpperCase()==='CTR'),
@@ -903,11 +908,15 @@ function parseSheet(sheetName){
       if(typeof click !== 'number' || typeof impr !== 'number') continue;
 
       const parsed = parseMaterialName(nameVal);
+      const _cost = cleanMoney(idx.cost>=0 ? r[idx.cost] : null);
+      const _inst = (idx.inst>=0 && typeof r[idx.inst]==='number') ? r[idx.inst] : null;
       out.push({
         渠道: currentChannel,
         ...parsed,
-        費用: cleanMoney(idx.cost>=0 ? r[idx.cost] : null),
+        費用: _cost,
         預約次數: idx.conv>=0 ? r[idx.conv] : null,
+        安裝次數: _inst,
+        CPI: (_cost!=null && _inst) ? _cost/_inst : null,
         CPA: cleanMoney(idx.cpa>=0 ? r[idx.cpa] : null),
         點擊: click,
         CTR: idx.ctr>=0 ? r[idx.ctr] : (click && impr ? click/impr : null),
@@ -958,11 +967,12 @@ function aggBy(field, rows){
   const g = {};
   rows.forEach(d=>{
     const key = d[field] || '未分類';
-    g[key] = g[key] || {click:0, impr:0, cost:0, conv:0, n:0};
+    g[key] = g[key] || {click:0, impr:0, cost:0, conv:0, inst:0, n:0};
     g[key].click += d.點擊 || 0;
     g[key].impr += d.曝光 || 0;
     g[key].cost += d.費用 || 0;
     g[key].conv += (typeof d.預約次數 === 'number' ? d.預約次數 : 0);
+    g[key].inst += (typeof d.安裝次數 === 'number' ? d.安裝次數 : 0);
     g[key].n++;
   });
   return Object.entries(g).map(([k,v])=>({
@@ -972,7 +982,8 @@ function aggBy(field, rows){
     cpm: v.impr ? v.cost/v.impr*1000 : null,
     cpc: v.click ? v.cost/v.click : null,
     cvr: v.click ? v.conv/v.click : 0,
-    click:v.click, impr:v.impr, cost:v.cost, conv:v.conv, n:v.n
+    cpi: v.inst ? v.cost/v.inst : null,
+    click:v.click, impr:v.impr, cost:v.cost, conv:v.conv, inst:v.inst, n:v.n
   }));
 }
 
@@ -986,14 +997,20 @@ const METRICS = {
   conv: { label:'轉換數',  unit:'',   get:d=>d.conv||0,                                 better:'high', fmt:v=>v.toLocaleString() },
   cvr:  { label:'CVR',    unit:'%',  get:d=>+(d.cvr*100).toFixed(2),                   better:'high', fmt:v=>v+'%' },
   cost: { label:'花費',    unit:'元', get:d=>Math.round(d.cost||0),                     better:'', fmt:v=>'$'+v.toLocaleString() },
+  inst: { label:'下載數',  unit:'',   get:d=>d.inst||0,                                 better:'high', fmt:v=>v.toLocaleString() },
+  cpi:  { label:'CPI',    unit:'元', get:d=>d.cpi==null?null:+d.cpi.toFixed(1),        better:'low',  fmt:v=>'$'+v },
 };
 // 目前資料的轉換欄位名稱（事前預約 / 安裝），用於圖表標題
 let CONV_LABEL = '轉換';
 function convFieldLabel(){ return CONV_LABEL; }
 
 // ══════════ 多指標彙總圖表 ══════════
-const ANGLE_METRICS = ['ctr','cpa','cpm','cpc','conv','cvr','cost'];
-const SP_METRICS    = ['ctr','cpa','cpm','cpc','conv','cvr','cost'];
+const BASE_METRICS  = ['ctr','cpa','cpm','cpc','conv','cvr','cost'];
+// 有「安裝次數」資料時才追加下載數 / CPI，避免出現全空的指標按鈕
+function metricKeys(agg){
+  const hasInst = Array.isArray(agg) && agg.some(d=>(d.inst||0) > 0);
+  return hasInst ? BASE_METRICS.concat(['inst','cpi']) : BASE_METRICS;
+}
 let ANGLE_AGG = [], SP_AGG = [], SP_AVG_CTR = 0;
 let ANGLE_M1 = 'ctr';   // 切角左圖指標（右圖固定顯示 CPA 作對照）
 let SP_M = 'ctr';       // 賣點圖指標
@@ -1039,7 +1056,7 @@ function drawAngleCharts(){
       scales:{y:{ticks:{callback:v=>m.fmt(v)}}} }
   });
   // 右圖＝對照指標：成效面看左圖時右圖給成本面，反之亦然，避免兩張圖講同一件事
-  const PAIR = { ctr:'cpa', cvr:'cpa', conv:'cpa', cost:'conv', cpa:'conv', cpm:'ctr', cpc:'ctr' };
+  const PAIR = { ctr:'cpa', cvr:'cpa', conv:'cpa', cost:'conv', cpa:'conv', cpm:'ctr', cpc:'ctr', inst:'cpi', cpi:'inst' };
   const rk = PAIR[ANGLE_M1] || 'cpa';
   const rm = METRICS[rk];
   const rdata = sortAggBy(ANGLE_AGG, ANGLE_M1);
@@ -1070,11 +1087,13 @@ function renderKpiOverview(rows, scopeLabel, allCount){
 
   const sum = (f)=>rows.reduce((s,r)=>s+(Number(r[f])||0),0);
   const cost = sum('費用'), impr = sum('曝光'), clk = sum('點擊'), conv = sum('預約次數');
+  const inst = sum('安裝次數');                       // 下載數（安裝）：獨立於主轉換
   const ctr  = impr ? clk/impr : null;
   const cpc  = clk ? cost/clk : null;
   const cpm  = impr ? cost/impr*1000 : null;
   const cpa  = conv ? cost/conv : null;
   const cvr  = clk ? conv/clk : null;
+  const cpi  = inst ? cost/inst : null;               // 每次下載成本
   // 切角 / 賣點的涵蓋度：讓使用者知道拆解得夠不夠細
   const angles = new Set(rows.map(r=>r.素材切角).filter(Boolean));
   const points = new Set(rows.map(r=>r.賣點).filter(Boolean));
@@ -1097,6 +1116,12 @@ function renderKpiOverview(rows, scopeLabel, allCount){
     { k:'CPA',           v:money2(cpa),       s:`每次${convName}成本`, hi:true },
     { k:'CVR',           v:pct(cvr),          s:`${convName} ÷ 點擊` },
   ];
+  // 下載數 / CPI：資料有「安裝次數」欄才顯示，且避免與主轉換重複
+  //（改版期以安裝為主轉換時，上方已呈現，這裡就不再重覆一張卡）
+  if(inst > 0 && convName !== '安裝'){
+    cards.push({ k:'下載數', v:num(inst), s:'安裝次數', hi:true });
+    cards.push({ k:'CPI',   v:money2(cpi), s:'每次下載成本', hi:true });
+  }
   el.innerHTML = cards.map(c=>
     `<div class="kpiCard${c.hi?' hi':''}">
        <p class="k">${esc(c.k)}</p>
@@ -1144,6 +1169,9 @@ function renderAggTable(bodyId, agg){
   if(!el) return;
   // 表頭的「轉換」欄改成實際名稱（事前預約 / 安裝）
   document.querySelectorAll('.convCol').forEach(th=>{ th.textContent = convFieldLabel(); });
+  // 有安裝資料才顯示下載數 / CPI 欄（避免整欄空白）
+  const showInst = Array.isArray(agg) && agg.some(d=>(d.inst||0) > 0);
+  document.querySelectorAll('.instCol, .cpiCol').forEach(th=>{ th.style.display = showInst ? '' : 'none'; });
   const thr = getImprThreshold();
   const f = (v,fmt)=> (v==null||isNaN(v)) ? '—' : fmt(v);
   el.innerHTML = agg.map(d=>{
@@ -1160,6 +1188,8 @@ function renderAggTable(bodyId, agg){
       <td class="numCell">${(d.conv||0).toLocaleString()}</td>
       <td class="numCell">${f(d.cpa, v=>'$'+v.toFixed(1))}</td>
       <td class="numCell">${fmtPct(d.cvr)}</td>
+      ${showInst ? `<td class="numCell">${(d.inst||0).toLocaleString()}</td>
+      <td class="numCell">${f(d.cpi, v=>'$'+v.toFixed(1))}</td>` : ''}
     </tr>`;
   }).join('');
 }
@@ -1394,7 +1424,7 @@ function renderAll(){
 
   // 切角：雙圖 + 可切換指標
   ANGLE_AGG = angleAgg;
-  renderMetricBar('angleMetricBar', ANGLE_METRICS, k=>{ ANGLE_M1 = k; drawAngleCharts(); });
+  renderMetricBar('angleMetricBar', metricKeys(angleAgg), k=>{ ANGLE_M1 = k; drawAngleCharts(); });
   drawAngleCharts();
   renderAggTable('angleTableBody', angleAgg);
 
@@ -1412,7 +1442,7 @@ function renderAll(){
   // 賣點：可切換指標
   SP_AGG = aggBy('賣點', perfData);
   SP_AVG_CTR = avgCTR;
-  renderMetricBar('spMetricBar', SP_METRICS, k=>{ SP_M = k; drawSpChart(); renderAggTable('spTableBody', sortAggBy(SP_AGG, SP_M)); });
+  renderMetricBar('spMetricBar', metricKeys(SP_AGG), k=>{ SP_M = k; drawSpChart(); renderAggTable('spTableBody', sortAggBy(SP_AGG, SP_M)); });
   drawSpChart();
   renderAggTable('spTableBody', sortAggBy(SP_AGG, SP_M));
 
@@ -3855,6 +3885,30 @@ function gapToHypo(key, dim){
 };
 
 // ── 週報圖卡匯出 ───────────────────────────────────────
+// 週報圖卡用的輕量 Markdown 轉換
+// AI 洞察常帶 **粗體**、### 標題、- 條列，直接 esc() 會把符號原樣印出來。
+// 先跳脫再轉換，確保仍防 XSS（不開放任何 HTML 標籤輸入）。
+function mdToCardHtml(text, gold){
+  const G = gold || '#E8C877';
+  return esc(String(text||''))
+    .split(/\r?\n/)
+    .map(line=>{
+      const t = line.trim();
+      if(!t) return '<div style="height:10px;"></div>';
+      // ### 標題（1~4 個 #）
+      const h = t.match(/^#{1,4}\s*(.+)$/);
+      if(h) return `<div style="font-size:14.5px; font-weight:700; color:${G}; margin:14px 0 6px;">${h[1].replace(/\*\*/g,'')}</div>`;
+      // - 或 ・ 條列
+      const li = t.match(/^[-*・]\s+(.+)$/);
+      const body = (li ? li[1] : t)
+        .replace(/\*\*([^*]+)\*\*/g, '<b style="color:'+G+';">$1</b>')   // **粗體**
+        .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<i>$1</i>');               // *斜體*
+      if(li) return `<div style="display:flex; gap:8px; margin:3px 0;"><span style="color:${G};">·</span><span style="flex:1;">${body}</span></div>`;
+      return `<div style="margin:3px 0;">${body}</div>`;
+    })
+    .join('');
+}
+
 document.getElementById('exportCardBtn').addEventListener('click', async ()=>{
   const snap = window.__lastPerfSnapshot;
   if(!snap){ alert('請先上傳並解析資料'); return; }
@@ -3904,12 +3958,26 @@ document.getElementById('exportCardBtn').addEventListener('click', async ()=>{
     ${lastAiSummary ? `
     <div style="margin-top:24px; background:${card}; border:1px solid ${line}; border-radius:12px; padding:18px 22px;">
       <div style="font-size:15px; font-weight:600; color:${gold}; margin-bottom:8px;">AI 視覺洞察</div>
-      <div style="font-size:13.5px; line-height:1.8; white-space:pre-wrap; color:#F2EDE3;">${esc(lastAiSummary.slice(0,600))}</div>
+      <div style="font-size:13.5px; line-height:1.75; color:#F2EDE3; word-break:break-word;">${mdToCardHtml(lastAiSummary, gold)}</div>
     </div>` : ''}
     <div style="margin-top:28px; padding-top:16px; border-top:1px solid ${line}; font-size:12px; color:${sub};">天堂M 運營部 · 素材成效分析工具自動產出</div>
   `;
   try{
-    const canvas = await html2canvas(el, {backgroundColor:'#0E1526', scale:2, useCORS:true, allowTaint:true});
+    // 內容長度不定：明確傳入元素完整尺寸，避免 html2canvas 只截到視窗高度
+    const fullW = el.offsetWidth || 1080;
+    // 高度取三者最大並設下限：任一來源失準時仍能輸出完整內容
+    const fullH = Math.max(
+      Math.ceil(el.scrollHeight || 0),
+      Math.ceil(el.offsetHeight || 0),
+      Math.ceil(el.getBoundingClientRect().height || 0),
+      600
+    );
+    const canvas = await html2canvas(el, {
+      backgroundColor:'#0E1526', scale:2, useCORS:true, allowTaint:true,
+      width: fullW, height: fullH,
+      windowWidth: fullW, windowHeight: fullH,
+      scrollX: 0, scrollY: 0
+    });
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
     a.download = `素材成效週報_${today}.png`;

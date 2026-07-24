@@ -121,6 +121,16 @@
   .histItem button{height:26px; font-size:11.5px; padding:0 10px;}
   /* 特徵交叉驗證與素材對比 */
   .metricBar{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px;}
+  .dateBar{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 16px;
+    background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 14px;}
+  .dateBar > label{font-size:13px; color:var(--text-muted);}
+  .chipBtn{font-size:12px; padding:4px 10px; border:1px solid var(--border); background:transparent;
+    border-radius:14px; cursor:pointer; color:var(--text-secondary);}
+  .chipBtn:hover{border-color:var(--gold); color:var(--gold);}
+  .chipBtn.on{background:var(--gold); border-color:var(--gold); color:#fff;}
+  .quickWrap{display:flex; gap:5px;}
+  .modeWrap{display:flex; gap:12px; padding-left:8px; border-left:1px solid var(--border);}
+  .modeLabel{font-size:12.5px; color:var(--text-secondary); display:flex; align-items:center; gap:4px; cursor:pointer;}
   .needApi{opacity:.5; cursor:not-allowed; position:relative;}
   .needApi::after{content:"需 API Key"; position:absolute; top:-8px; right:-6px; font-size:9.5px;
     background:var(--amber-bg,#faf2e2); color:var(--amber,#92640c); border:1px solid var(--amber,#92640c);
@@ -281,7 +291,29 @@
         <option value="全部">全部渠道合併</option>
       </select>
     </div>
-    <p class="sub" id="contextHint" style="margin:-4px 0 18px;"></p>
+    <p class="sub" id="contextHint" style="margin:-4px 0 10px;"></p>
+
+    <div class="dateBar" id="dateBar" style="display:none;">
+      <label>走期篩選：</label>
+      <input type="date" id="dateFrom" style="width:150px;">
+      <span class="dSep">~</span>
+      <input type="date" id="dateTo" style="width:150px;">
+      <span class="quickWrap">
+        <button class="chipBtn" data-q="all">全部</button>
+        <button class="chipBtn" data-q="7">近 7 天</button>
+        <button class="chipBtn" data-q="14">近 14 天</button>
+        <button class="chipBtn" data-q="30">近 30 天</button>
+      </span>
+      <span class="modeWrap">
+        <label class="modeLabel" title="素材走期只要與篩選區間有交集就納入，看得到較多素材">
+          <input type="radio" name="dateMode" value="overlap" checked> 重疊即納入
+        </label>
+        <label class="modeLabel" title="素材走期需完全落在篩選區間內才納入，數字較精準">
+          <input type="radio" name="dateMode" value="contain"> 完全包含
+        </label>
+      </span>
+      <span class="progressText" id="dateHint" style="margin-top:0;"></span>
+    </div>
 
     <section id="kpiSection" style="display:none;">
       <h2>整體成效總覽</h2>
@@ -860,6 +892,46 @@ function cleanMoney(x){
   return isNaN(n) ? null : n;
 }
 
+// 走期字串 → ISO 日期區間（容錯：舊格式命名寫法不一）
+// 支援：0624-0707 / 0625 / 6/25 / 6-24-7-7 / 6/24-7/7 / 0708-0731
+// 無年份時以「資料中出現的年份」或當年推定；跨年（12月→1月）自動加一年。
+function parsePeriodToIso(raw, baseYear){
+  if(!raw) return { start:null, end:null };
+  const s = String(raw).trim();
+  if(!s) return { start:null, end:null };
+  const Y = baseYear || new Date().getFullYear();
+  const pad = n => ('0'+n).slice(-2);
+  const mk = (m, d, y) => (m>=1 && m<=12 && d>=1 && d<=31) ? `${y}-${pad(m)}-${pad(d)}` : null;
+
+  // 先抽出所有「月日」配對。順序很重要：4 碼形式要先判，
+  // 否則 0624-0707 會被「1-2碼分隔」的規則誤拆成 24-07。
+  let nums = [];
+  const fourAll = s.match(/\d{4}/g);                       // 0624 / 0707
+  const isFourStyle = fourAll && new RegExp('^\\s*\\d{4}(\\s*[-~至]\\s*\\d{4})?\\s*$').test(s);
+  if(isFourStyle){
+    nums = fourAll.map(f => [parseInt(f.slice(0,2),10), parseInt(f.slice(2),10)]);
+  }else{
+    // 以 / - . 分隔的月日（6/25、6-24-7-7、6/24-7/7）
+    const md = [...s.matchAll(/(\d{1,2})\s*[\/\-.]\s*(\d{1,2})/g)].map(m=>[+m[1], +m[2]]);
+    if(md.length){
+      nums = md;
+    }else if(fourAll){
+      nums = fourAll.map(f => [parseInt(f.slice(0,2),10), parseInt(f.slice(2),10)]);
+    }
+  }
+  if(!nums.length) return { start:null, end:null };
+
+  let start = mk(nums[0][0], nums[0][1], Y);
+  let end   = nums.length > 1 ? mk(nums[1][0], nums[1][1], Y) : start;
+  if(!start) return { start:null, end:null };
+  // 跨年：迄日早於起日 → 迄日加一年
+  if(end && end < start){
+    const [m,d] = nums[1];
+    end = mk(m, d, Y+1);
+  }
+  return { start, end: end || start };
+}
+
 function parseMaterialName(raw){
   const name = String(raw).split('\n')[0];
   const parts = name.split('_');
@@ -877,6 +949,9 @@ function parseMaterialName(raw){
 
 function parseSheet(sheetName){
   errArea.innerHTML='';
+  // 從分頁名推定資料年份（例：202606_妖精改版 → 2026），推不出則用當年
+  const _ym = String(sheetName||'').match(/(20\d{2})(0[1-9]|1[0-2])?/);
+  const DATA_YEAR = _ym ? parseInt(_ym[1],10) : new Date().getFullYear();
   const ws = workbook.Sheets[sheetName];
   if(!ws){ errArea.innerHTML = `<div class="errBox">找不到分頁「${sheetName}」。</div>`; return; }
   const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
@@ -921,17 +996,23 @@ function parseSheet(sheetName){
       dashboard.style.display='none';
       return;
     }
-    const mmdd = v => {
-      if(v==null) return null;
+    // 走期日期：同時保留「完整 ISO 日期」供區間篩選，與「MMDD」供畫面顯示
+    const toDate = v => {
+      if(v==null || v==='') return null;
       let d;
       if(v instanceof Date) d = v;
       else if(typeof v === 'number'){          // Excel 序號日期（epoch 1899-12-30）
         d = new Date(Date.UTC(1899, 11, 30) + v * 86400000);
       }else d = new Date(v);
-      if(isNaN(d.getTime())) return null;
-      return ('0'+(d.getUTCMonth()+1)).slice(-2) + ('0'+d.getUTCDate()).slice(-2);
+      return isNaN(d.getTime()) ? null : d;
     };
-    let curD0 = null, curD1 = null;   // 走期常只填在首列，往下沿用
+    const toIso  = v => { const d = toDate(v); return d ? d.toISOString().slice(0,10) : null; };
+    const mmdd = v => {
+      const d = toDate(v);
+      return d ? ('0'+(d.getUTCMonth()+1)).slice(-2) + ('0'+d.getUTCDate()).slice(-2) : null;
+    };
+    let curD0 = null, curD1 = null;       // 走期常只填在首列，往下沿用
+    let curI0 = null, curI1 = null;       // 對應的 ISO 日期
     for(let i=headerIdx+1; i<rows.length; i++){
       const r = rows[i];
       if(!r) continue;
@@ -943,8 +1024,8 @@ function parseSheet(sheetName){
       if(!theme) continue;
       const click = r[ci.click], impr = r[ci.impr];
       if(typeof click !== 'number' || typeof impr !== 'number') continue;
-      if(ci.d0>=0 && r[ci.d0]!=null) curD0 = mmdd(r[ci.d0]);
-      if(ci.d1>=0 && r[ci.d1]!=null) curD1 = mmdd(r[ci.d1]);
+      if(ci.d0>=0 && r[ci.d0]!=null){ curD0 = mmdd(r[ci.d0]); curI0 = toIso(r[ci.d0]); }
+      if(ci.d1>=0 && r[ci.d1]!=null){ curD1 = mmdd(r[ci.d1]); curI1 = toIso(r[ci.d1]); }
       const ch = ci.ch>=0 ? String(r[ci.ch]||'').trim() : '';
       const goal = ci.goal>=0 ? String(r[ci.goal]||'').trim() : '';
       const fmt = ci.fmt>=0 ? String(r[ci.fmt]||'').trim() : null;
@@ -961,6 +1042,8 @@ function parseSheet(sheetName){
         素材切角: appeal || null,
         賣點: theme,
         走期: (curD0 && curD1) ? `${curD0}-${curD1}` : null,
+        走期起: curI0,                                   // ISO 完整日期，供區間篩選
+        走期迄: curI1,
         命名完整: !!(fmt && appeal && theme),            // 欄位式本身即結構，齊備即合格
         素材名稱: [fmt, appeal, theme].filter(Boolean).join('_'),
         費用: cost,
@@ -1008,11 +1091,14 @@ function parseSheet(sheetName){
       if(typeof click !== 'number' || typeof impr !== 'number') continue;
 
       const parsed = parseMaterialName(nameVal);
+      const _per = parsePeriodToIso(parsed.走期, DATA_YEAR);
       const _cost = cleanMoney(idx.cost>=0 ? r[idx.cost] : null);
       const _inst = (idx.inst>=0 && typeof r[idx.inst]==='number') ? r[idx.inst] : null;
       out.push({
         渠道: currentChannel,
         ...parsed,
+        走期起: _per.start,
+        走期迄: _per.end,
         費用: _cost,
         預約次數: idx.conv>=0 ? r[idx.conv] : null,
         安裝次數: _inst,
@@ -1034,6 +1120,12 @@ function parseSheet(sheetName){
 
   RAW = out;
   saveOwnState();
+  // 換分頁＝換資料，重設走期篩選避免沿用上一份的區間
+  DATE_FROM = ''; DATE_TO = '';
+  const _df = document.getElementById('dateFrom'), _dt = document.getElementById('dateTo');
+  if(_df) _df.value = ''; if(_dt) _dt.value = '';
+  document.querySelectorAll('#dateBar .chipBtn').forEach(b=>b.classList.toggle('on', b.dataset.q === 'all'));
+  initDateBar();
   dashboard.style.display='block';
   imageMap = {};
   renderNameCheck();
@@ -1496,15 +1588,80 @@ async function downloadImagesAsZip(images){
 }
 // ────────────────────────────────────────────────────────────
 
+// ══════════ 走期區間篩選 ══════════
+// 素材帶的是「走期區間」而非單一日期，因此提供兩種判定：
+//   overlap = 走期與篩選區間有交集就納入（看得到較多素材）
+//   contain = 走期需完全落在篩選區間內（數字較精準）
+// 註：成效數字是整個走期的加總，工具只能篩「哪些素材在跑」，無法切出區間內的逐日數字。
+let DATE_FROM = '', DATE_TO = '', DATE_MODE = 'overlap';
+
+function applyDateFilter(rows){
+  if(!DATE_FROM && !DATE_TO) return rows;
+  const from = DATE_FROM || '0000-00-00';
+  const to   = DATE_TO   || '9999-12-31';
+  return rows.filter(r=>{
+    const s = r.走期起, e = r.走期迄 || r.走期起;
+    if(!s) return false;                       // 無走期資料者在有篩選時排除
+    return DATE_MODE === 'contain'
+      ? (s >= from && e <= to)                 // 完全包含
+      : (s <= to && e >= from);                // 有交集
+  });
+}
+
+// 依目前資料的走期範圍，初始化日期欄位的可選範圍
+function initDateBar(){
+  const bar = document.getElementById('dateBar');
+  if(!bar) return;
+  const dated = RAW.filter(r=>r.走期起);
+  if(!dated.length){ bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  const starts = dated.map(r=>r.走期起).sort();
+  const ends   = dated.map(r=>r.走期迄 || r.走期起).sort();
+  const min = starts[0], max = ends[ends.length-1];
+  const f = document.getElementById('dateFrom'), t = document.getElementById('dateTo');
+  f.min = min; f.max = max; t.min = min; t.max = max;
+  const noDate = RAW.length - dated.length;
+  document.getElementById('dateHint').textContent =
+    `資料走期範圍 ${min} ~ ${max}` + (noDate ? `（${noDate} 筆無走期資料，篩選時會被排除）` : '');
+}
+
+function setDateQuick(q){
+  const f = document.getElementById('dateFrom'), t = document.getElementById('dateTo');
+  document.querySelectorAll('#dateBar .chipBtn').forEach(b=>b.classList.toggle('on', b.dataset.q === q));
+  if(q === 'all'){ f.value = ''; t.value = ''; }
+  else{
+    const dated = RAW.filter(r=>r.走期起);
+    if(!dated.length) return;
+    const maxEnd = dated.map(r=>r.走期迄 || r.走期起).sort().slice(-1)[0];
+    const end = new Date(maxEnd + 'T00:00:00Z');
+    const start = new Date(end.getTime() - (parseInt(q,10) - 1) * 86400000);
+    f.value = start.toISOString().slice(0,10);
+    t.value = maxEnd;
+  }
+  DATE_FROM = f.value; DATE_TO = t.value;
+  renderAll();
+}
+
+function onDateChange(){
+  DATE_FROM = document.getElementById('dateFrom').value;
+  DATE_TO   = document.getElementById('dateTo').value;
+  document.querySelectorAll('#dateBar .chipBtn').forEach(b=>b.classList.toggle('on', b.dataset.q === 'all' && !DATE_FROM && !DATE_TO));
+  renderAll();
+}
+
 function renderAll(){
 
   const channelSet = getContextChannels();
-  const perfData = channelSet.length ? RAW.filter(d=>channelSet.includes(d.渠道)) : RAW;
+  const byChannel = channelSet.length ? RAW.filter(d=>channelSet.includes(d.渠道)) : RAW;
+  const perfData = applyDateFilter(byChannel);   // 再套走期區間篩選
 
   const ctxLabel = {'導流':'導流情境（成效型渠道）','曝光':'曝光情境（曝光型渠道）','全部':'全部渠道合併'}[document.getElementById('contextSelect').value];
-  document.getElementById('contextHint').textContent = channelSet.length
+  const dateNote = (DATE_FROM || DATE_TO)
+    ? `　｜　走期篩選 ${DATE_FROM||'不限'} ~ ${DATE_TO||'不限'}（${DATE_MODE==='contain'?'完全包含':'重疊即納入'}）：${perfData.length} / ${byChannel.length} 筆`
+    : '';
+  document.getElementById('contextHint').textContent = (channelSet.length
     ? `目前彙總範圍：${ctxLabel}，共 ${channelSet.length} 個渠道（${channelSet.join('、')}）`
-    : `目前選擇的情境下沒有對應渠道資料，已改用全部渠道。`;
+    : `目前選擇的情境下沒有對應渠道資料，已改用全部渠道。`) + dateNote;
 
   const totalMaterials = new Set(RAW.map(d=>d.賣點+d.格式)).size;
   const totalClick = perfData.reduce((s,d)=>s+(d.點擊||0),0);
@@ -4469,6 +4626,16 @@ function dpReportToHtml(text, gold){
 
 dpLoadDraft();
 
+
+// 走期篩選事件
+document.getElementById('dateFrom').addEventListener('change', onDateChange);
+document.getElementById('dateTo').addEventListener('change', onDateChange);
+document.querySelectorAll('#dateBar .chipBtn').forEach(b=>{
+  b.addEventListener('click', ()=>setDateQuick(b.dataset.q));
+});
+document.querySelectorAll('input[name="dateMode"]').forEach(r=>{
+  r.addEventListener('change', ()=>{ DATE_MODE = r.value; if(DATE_FROM || DATE_TO) renderAll(); });
+});
 
 // 初始化
 loadSettings();

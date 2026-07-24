@@ -50,6 +50,28 @@
   .card .value{font-size:22px; font-weight:600; margin:0;}
   section{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px 22px; margin-bottom:20px;}
   section h2{font-size:15px; font-weight:600; margin:0 0 14px;}
+  /* 區塊收合 */
+  section h2.collHead{cursor:pointer; user-select:none; display:flex; align-items:center; gap:7px; transition:color .15s;}
+  section h2.collHead:hover{color:var(--teal);}
+  .collCaret{display:inline-block; font-size:11px; color:var(--text-muted); transition:transform .18s ease; flex:none;}
+  section.collapsed .collCaret{transform:rotate(-90deg);}
+  section.collapsed > h2{margin-bottom:0;}
+  section.collapsed .collBody{display:none;}
+  .mdBox{margin-top:16px; padding:14px 16px; border:1px dashed var(--border); border-radius:8px; background:rgba(91,123,181,.05);}
+  .mdTitle{font-size:13.5px; font-weight:600; margin:0 0 4px;}
+  .mdSub{font-size:11.5px; font-weight:400; color:var(--text-muted);}
+  .nwBox{margin-top:18px; padding:16px; border:1px solid var(--teal); border-radius:8px; background:var(--teal-bg);}
+  .nwOut{margin-top:12px; padding:14px 16px; background:var(--card,#fff); border:1px solid var(--border); border-radius:7px; font-size:13px; line-height:1.85; white-space:pre-wrap;}
+  .moBox{margin-top:18px;}
+  .moGrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin-top:10px;}
+  .moCard{border:1px solid var(--border); border-radius:7px; padding:12px 14px; background:rgba(91,123,181,.05);}
+  .moDim{font-size:13px; font-weight:600; margin:0 0 8px;}
+  .moRow{display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px;}
+  .moBarWrap{flex:1; height:7px; background:var(--border); border-radius:4px; overflow:hidden;}
+  .moBar{height:100%; background:#5b7bb5;}
+  .collAllBar{display:flex; justify-content:flex-end; gap:8px; margin:0 0 10px;}
+  .collAllBar button{border:1px solid var(--border); background:transparent; color:var(--text-muted); font-size:11.5px; padding:3px 10px; border-radius:5px; cursor:pointer;}
+  .collAllBar button:hover{border-color:var(--teal); color:var(--teal);}
   .chart-row{display:grid; grid-template-columns:1fr 1fr; gap:20px;}
   canvas{max-height:260px;}
   .controls{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
@@ -528,6 +550,20 @@
         <button class="ghostBtn" id="mkGenPromptBtn" style="height:34px; font-size:13px;">手動：產生市場素材 Prompt</button>
         <button class="ghostBtn" id="mkClearTaggedBtn" style="display:none;"></button>
       </div>
+
+      <!-- 市場專屬維度：只標市場素材，用於發掘我方沒做過的手法 -->
+      <div class="mdBox">
+        <p class="mdTitle">市場專屬維度 <span class="mdSub">只標市場素材，不標我方——用來發掘競品在玩、但我們根本沒想過的手法</span></p>
+        <p class="sub" style="margin:0 0 10px; font-size:12px;">共用 18 維與我方自訂維度用於「同一把尺」的交叉比較；這裡新增的維度只會出現在市場素材的標籤裡，不進決策矩陣，而是獨立呈現在下方「市場專屬手法分佈」。</p>
+        <div class="controls" style="margin-bottom:8px;">
+          <input id="mdName" placeholder="維度名稱，例：聯名IP露出" style="width:180px;">
+          <input id="mdHint" placeholder="選項提示，例：有或無" style="width:230px;">
+          <button class="ghostBtn" id="mdAddBtn">＋新增</button>
+          <button class="ghostBtn" id="mdSuggestBtn">⚡ AI 提議市場維度</button>
+        </div>
+        <div id="mdSuggestWrap" style="margin-bottom:8px;"></div>
+        <div id="mdList"></div>
+      </div>
       <div id="metaInboxBar" style="display:none; background:var(--teal-bg); color:var(--teal); border-radius:8px; padding:8px 12px; margin:8px 0; font-size:13px; font-weight:600;"></div>
       <div id="metaCfg" style="display:none; border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin:10px 0; background:var(--surface);">
         <p style="font-size:13px; font-weight:600; margin:0 0 6px;">Meta 廣告庫書籤　<span class="sub" style="font-weight:400;">抓 Facebook / Instagram 競品廣告（Apify 抓的是 Google，兩者互補）</span></p>
@@ -627,6 +663,23 @@
       <p class="sub" style="margin:0 0 12px;">競品成效不可得，因此市場端比的是「特徵出現占比」（以存活天數加權，存活越久代表越可能在跑量）。<b>但我方這端有實際 CTR</b>——工具會把三者交叉，判斷市場愛用的特徵套在我們自己素材上到底有沒有效，直接分出「該加碼」與「別跟風」。</p>
       <div id="mvsWrap"><p class="empty">需要我方 ≥3 支已標籤素材＋市場 ≥3 支已標籤素材，對比會自動出現。</p></div>
       <div id="mvsGaps"></div>
+      <div id="mvsMarketOnly"></div>
+
+      <!-- 收斂點：把我方成效 × 市場分佈 × 市場專屬手法一次餵給 AI -->
+      <div class="nwBox">
+        <p class="mdTitle">下一波素材建議 <span class="mdSub">前面所有分析的收斂點——導向一個可執行的製作方向</span></p>
+        <p class="sub" style="margin:0 0 10px; font-size:12px;">AI 會同時讀取三份資料：①我方素材的標籤 × 實際 CTR／CPA（哪些特徵真的有效）②市場素材的特徵分佈（競品在押什麼）③市場專屬維度（競品有、我們沒有的手法），產出下一波素材的具體製作建議。</p>
+        <div class="controls" style="margin-bottom:8px;">
+          <input id="nwContext" placeholder="補充脈絡（選填），例：8月改版走期、預算 300 萬、主打新職業" style="flex:1; min-width:280px;">
+          <button class="primaryBtn" id="nextWaveBtn" style="height:34px; font-size:13px;">⚡ AI 產出下一波素材建議</button>
+          <button class="ghostBtn" id="nwCopyBtn" style="display:none;">複製建議</button>
+        </div>
+        <div id="nwProgress" style="display:none; margin-top:10px;">
+          <div class="progTrack"><div class="progBar" id="nwProgBar"></div></div>
+          <span class="progressText" id="nwProgText"></span>
+        </div>
+        <div id="nwOutput"></div>
+      </div>
     </section>
 
     <section id="dailySection">
@@ -1932,8 +1985,13 @@ const TAG_FIELDS = [
   ["懷舊元素","有或無"]
 ];
 function getCustomDims(){ return lsGet(LS.customDims, []); }
-function getTagSchema(){
-  const fields = TAG_FIELDS.concat(getCustomDims().map(d=>[d.name, d.hint || '請依素材內容判斷']));
+// 市場專屬維度：只標市場素材，用來發掘我方完全沒做過的視覺手法
+function getMarketDims(){ return lsGet(LS.marketDims, []); }
+// 市場素材的完整維度＝共用 18 維 ＋ 我方自訂維度 ＋ 市場專屬維度
+function marketAllDims(){ return allCrossDims().concat(getMarketDims().map(d=>d.name)); }
+function getTagSchema(isMarket){
+  let fields = TAG_FIELDS.concat(getCustomDims().map(d=>[d.name, d.hint || '請依素材內容判斷']));
+  if(isMarket) fields = fields.concat(getMarketDims().map(d=>[d.name, d.hint || '請依素材內容判斷']));
   return '{\n' + fields.map(([k,v])=>`  "${k}":"${v}"`).join(',\n') + '\n}';
 }
 
@@ -1954,7 +2012,7 @@ ${perfLines || '（無配對成效數據）'}
 請完成兩件事：
 
 【任務一】針對「每一張」圖片輸出結構化的視覺特徵標籤，欄位格式如下（檔名必須跟我提供的清單完全一致，用來對應）：
-${getTagSchema()}
+${getTagSchema(false)}
 
 補充判斷依據：
 - 「主色系」以畫面占比最大的色系為準；若無明顯主色（三種以上色系均衡分布）選「多彩混合」。
@@ -2253,6 +2311,8 @@ document.getElementById('applySummaryBtn').addEventListener('click', ()=>{
 let lastAiSummary = null;
 const LS = { settings:'mt_settings', history:'mt_history', hypo:'mt_hypotheses' };
 LS.own = 'mt_own';   // 我方素材持久化：{ raw, ai, imgNames }
+LS.collapse = 'mt_collapse';        // 區塊收合狀態
+LS.marketDims = 'mt_market_dims';   // 市場專屬維度（僅標市場素材，用於發掘我方沒做過的手法）
 const lsGet = (k, fb) => { try{ const v = JSON.parse(localStorage.getItem(k)); return v==null ? fb : v; }catch(e){ return fb; } };
 const lsSet = (k, v) => { try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ alert('瀏覽器儲存空間不足。\n\n可能原因：歷史紀錄或市場素材過多。\n建議：先「匯出歷史庫（JSON）」備份，再到市場素材庫點「清理圖片」釋放空間（標籤資料會保留）。'); } };
 // HTML 跳脫：任何來自 Excel／使用者輸入／AI 回傳的字串進 innerHTML 前都要過這層
@@ -2526,6 +2586,7 @@ document.getElementById('exportFullBtn').addEventListener('click', async ()=>{
       hypotheses: lsGet(LS.hypo, []),
       market: packed,
       customDims: lsGet(LS.customDims, []),
+      marketDims: lsGet(LS.marketDims, []),
       settings: lsGet(LS.settings, {})
     };
     const json = JSON.stringify(payload);
@@ -2558,6 +2619,7 @@ document.getElementById('exportJsonBtn').addEventListener('click', ()=>{
     hypotheses: lsGet(LS.hypo, []),
     market: lsGet(LS.market, []),
     customDims: lsGet(LS.customDims, []),
+    marketDims: lsGet(LS.marketDims, []),
     settings: lsGet(LS.settings, {})
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
@@ -2612,6 +2674,14 @@ document.getElementById('importJsonInput').addEventListener('change', e=>{
         data.customDims.forEach(d=>{ if(d.name && !names.has(d.name)) curD.push(d); });
         lsSet(LS.customDims, curD);
         renderCustomDims();
+      }
+      if(Array.isArray(data.marketDims)){
+        const curMD = lsGet(LS.marketDims, []);
+        // 去重時同時比對共用維度，避免匯入後與 18 維或自訂維度撞名
+        const taken = new Set(curMD.map(d=>d.name).concat(allCrossDims()));
+        data.marketDims.forEach(d=>{ if(d.name && !taken.has(d.name)){ curMD.push(d); taken.add(d.name); } });
+        lsSet(LS.marketDims, curMD);
+        renderMarketDims();
       }
       if(data.settings && typeof data.settings==='object'){ lsSet(LS.settings, Object.assign(lsGet(LS.settings, {}), data.settings)); loadSettings(); }
       renderHistory();
@@ -2732,7 +2802,7 @@ function refreshApiUI(){
   badge.className = 'apiBadge ' + (on ? 'on' : 'off');
   // AI 按鈕：一律顯示（讓使用者知道有這些功能），未設定 API Key 時停用並提示
   // —— 過去是直接隱藏，導致「功能突然不見」的困惑。
-  ['autoAnalyzeBtn','mkAutoTagBtn','cdSuggestBtn','aiReportBtn'].forEach(id=>{
+  ['autoAnalyzeBtn','mkAutoTagBtn','cdSuggestBtn','mdSuggestBtn','nextWaveBtn','aiReportBtn'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
     el.style.display = '';
@@ -2746,7 +2816,7 @@ function refreshApiUI(){
   const aa = document.getElementById('autoAnalyzeBtn');
   // 一鍵分析另有「要有圖片」的條件，兩者皆須滿足才可按
   if(aa) aa.disabled = !on || uploadedImages.length === 0;
-  ['mkAutoTagBtn','cdSuggestBtn','aiReportBtn'].forEach(id=>{
+  ['mkAutoTagBtn','cdSuggestBtn','mdSuggestBtn','nextWaveBtn','aiReportBtn'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.disabled = !on;
   });
@@ -2880,7 +2950,7 @@ async function autoTagImages(images, onProgress, isMarket){
 
 每張圖片前會先給一行【檔名】，回傳時「檔名」欄位必須與之完全一致。
 欄位格式如下：
-${getTagSchema()}
+${getTagSchema(isMarket)}
 
 判斷依據：
 - 「訴求類型」：主打折扣/贈品=促銷優惠；喚起回憶/情懷=情感懷舊；展示強度/裝備/戰力=實力展示；解說玩法/版本內容=內容資訊；賣關子=懸念好奇。
@@ -3097,6 +3167,7 @@ function renderCustomDims(){
 }
 function refreshDimViews(){
   if(Object.keys(aiResults).length) renderFeatureCross();
+  renderMarketDims();
   renderMarketList(); // 維度變動 → 市場標籤表與缺漏警示需同步（renderMarketList 內會呼叫 renderMarketCompare）
 }
 document.getElementById('cdAddBtn').addEventListener('click', ()=>{
@@ -3117,6 +3188,94 @@ document.getElementById('cdAddBtn').addEventListener('click', ()=>{
   lsSet(LS.customDims, dims);
   document.getElementById('cdName').value=''; document.getElementById('cdHint').value='';
   renderCustomDims(); refreshDimViews();
+});
+
+// ── 市場專屬維度 ───────────────────────────────────────
+function renderMarketDims(){
+  const list = document.getElementById('mdList');
+  if(!list) return;
+  const dims = getMarketDims();
+  list.innerHTML = dims.length
+    ? dims.map((d,i)=>`<span class="featTag" style="margin:0 8px 6px 0;">${esc(d.name)}<span style="color:var(--text-muted);">｜${esc(d.hint||'')}</span> <button type="button" data-i="${i}" class="mdDel" style="border:none; background:transparent; color:var(--coral); cursor:pointer; font-size:12px; padding:0 2px;">✕</button></span>`).join('')
+    : '<span style="font-size:12px; color:var(--text-muted);">尚無市場專屬維度</span>';
+  list.querySelectorAll('.mdDel').forEach(a=>a.addEventListener('click', e=>{
+    e.preventDefault();
+    const dims2 = getMarketDims();
+    const d = dims2[+a.dataset.i];
+    if(!confirm(`移除市場專屬維度「${d.name}」？既有標籤資料保留，但不再出現於市場 Prompt 與手法分佈。`)) return;
+    dims2.splice(+a.dataset.i,1); lsSet(LS.marketDims, dims2);
+    renderMarketDims(); refreshDimViews();
+  }));
+}
+function validDimInput(name, hint){
+  if(!name){ alert('請填維度名稱'); return false; }
+  if(/["\\\n\r]/.test(name) || /["\\\n\r]/.test(hint)){
+    alert('維度名稱與選項提示不可包含雙引號、反斜線或換行（會破壞 Prompt 的 JSON 格式）'); return false;
+  }
+  if(name.length > 20 || hint.length > 80){
+    alert('維度名稱請在 20 字內、選項提示在 80 字內'); return false;
+  }
+  if(name==='檔名' || TAG_FIELDS.some(f=>f[0]===name) || getCustomDims().some(d=>d.name===name) || getMarketDims().some(d=>d.name===name)){
+    alert(`「${name}」與既有維度重複`); return false;
+  }
+  return true;
+}
+document.getElementById('mdAddBtn').addEventListener('click', ()=>{
+  const name = document.getElementById('mdName').value.trim();
+  const hint = document.getElementById('mdHint').value.trim();
+  if(!validDimInput(name, hint)) return;
+  const dims = getMarketDims();
+  dims.push({name, hint});
+  lsSet(LS.marketDims, dims);
+  document.getElementById('mdName').value=''; document.getElementById('mdHint').value='';
+  renderMarketDims(); refreshDimViews();
+});
+document.getElementById('mdSuggestBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('mdSuggestBtn');
+  const wrap = document.getElementById('mdSuggestWrap');
+  // 關鍵：只餵競品素材給 AI，讓它從競品角度提議我們沒有的維度
+  const samples = marketAll().filter(i=>imgPart(i.dataUrl)).slice(0, 6);
+  if(!samples.length){ alert('請先加入市場素材圖片（需有實際圖片內容，僅連結無法分析）'); return; }
+  btn.disabled = true;
+  wrap.innerHTML = '<span class="progressText">AI 只看競品素材、思考中…</span>';
+  try{
+    const existing = marketAllDims().join('、');
+    const games = [...new Set(samples.map(i=>i.game).filter(Boolean))].join('、');
+    const parts = [{ text: `你是遊戲行銷素材分析師。以下是「市場上其他遊戲」的廣告素材${games ? `（${games}）` : ''}。
+
+我們目前分析素材時已使用這些維度：
+${existing}
+
+請「只根據這些競品素材」，提議 3 個目前清單裡完全沒有、但這些競品明顯在使用的視覺或訴求手法維度。重點是找出「我們自己從來沒做過、所以現有維度描述不到」的特徵——不要提議現有維度的同義改寫。
+每個維度要能用少數幾個離散選項描述（方便統計占比）。
+
+只回傳 JSON：{"維度":[{"name":"維度名稱(20字內)","hint":"選項A或選項B或選項C","why":"一句話說明這在競品素材上如何呈現、為何值得追蹤(40字內)"}]}` }];
+    samples.forEach(img=>{ const p = imgPart(img.dataUrl); if(p) parts.push(p); });
+    const txt = await callGemini(parts);
+    const p = parseJsonSafe(txt);
+    const dims = (p && Array.isArray(p.維度) ? p.維度 : []).filter(d=>d && d.name);
+    if(!dims.length){ wrap.innerHTML = '<span class="progressText">AI 沒有提出有效建議，請再試一次</span>'; return; }
+    window.__sugMktDims = dims;
+    wrap.innerHTML = dims.map((d, i)=>{
+      const dup = marketAllDims().includes(d.name);
+      return `<span class="sugChip"><b>${esc(d.name)}</b>｜${esc(d.hint || '')}${d.why ? `　<span style="color:var(--text-muted);">${esc(d.why)}</span>` : ''}
+        ${dup ? '<span style="color:var(--text-muted);">已存在</span>' : `<button class="mdSugAdd" data-i="${i}">＋加入</button>`}</span>`;
+    }).join('');
+    wrap.querySelectorAll('.mdSugAdd').forEach(b=>b.addEventListener('click', ()=>{
+      const d = window.__sugMktDims[+b.dataset.i];
+      if(!d) return;
+      const name = String(d.name).replace(/["\\\n\r]/g, '').slice(0, 20);
+      const hint = String(d.hint || '').replace(/["\\\n\r]/g, '').slice(0, 80);
+      if(marketAllDims().includes(name)){ alert('此維度已存在'); return; }
+      const dims2 = getMarketDims();
+      dims2.push({ name, hint });
+      lsSet(LS.marketDims, dims2);
+      renderMarketDims(); refreshDimViews();
+      b.outerHTML = '<span style="color:var(--teal);">✓ 已加入</span>';
+    }));
+  }catch(e){
+    wrap.innerHTML = `<span class="progressText" style="color:var(--coral);">✗ ${esc(e.message)}</span>`;
+  }finally{ btn.disabled = false; }
 });
 
 // ── 市場素材庫（競品對比） ─────────────────────────────
@@ -3345,7 +3504,7 @@ function renderMarketList(){
   const items = marketAll();
   if(!items.length){ list.innerHTML = '<p class="empty">尚無市場素材。填好遊戲名稱與首見日期後選擇圖片加入。</p>'; return; }
   const tagged = items.filter(i=>i.tags).length;
-  const dims = allCrossDims();
+  const dims = marketAllDims();   // 共用18維 ＋ 我方自訂 ＋ 市場專屬
   const view = lsGet(LS.mkView, 'compact');
 
   // 標籤完整度：已標籤素材是否涵蓋當前所有維度（新增自訂維度後舊資料會缺）
@@ -3354,7 +3513,7 @@ function renderMarketList(){
 
   const head = `
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-      <span style="font-size:12.5px; color:var(--text-secondary);">共 ${items.length} 支市場素材，已標籤 ${tagged} 支（維度標準與我方素材完全相同：${dims.length} 維）</span>
+      <span style="font-size:12.5px; color:var(--text-secondary);">共 ${items.length} 支市場素材，已標籤 ${tagged} 支（共用 ${allCrossDims().length} 維與我方相同${getMarketDims().length ? ` ＋ 市場專屬 ${getMarketDims().length} 維` : ''}）</span>
       <span>
         <button class="ghostBtn mkViewBtn" data-v="compact" style="height:26px; font-size:11.5px; ${view==='compact'?'border-color:var(--teal); color:var(--teal);':''}">摘要</button>
         <button class="ghostBtn mkViewBtn" data-v="full" style="height:26px; font-size:11.5px; ${view==='full'?'border-color:var(--teal); color:var(--teal);':''}">完整 ${dims.length} 維</button>
@@ -3440,7 +3599,7 @@ document.getElementById('mkGenPromptBtn').addEventListener('click', ()=>{
 ${fileList}
 
 請針對每一張輸出結構化視覺特徵標籤，欄位格式（檔名須與清單完全一致）：
-${getTagSchema()}
+${getTagSchema(true)}
 
 請回傳一個 JSON 物件，格式：{"標籤":[每張各一筆的物件陣列]}，不要其他文字、不要 markdown 標記。`;
   document.getElementById('mkPromptOutput').value = prompt;
@@ -4061,10 +4220,11 @@ document.getElementById('mkFetchImgBtn').addEventListener('click', async ()=>{
 });
 
 // ── 我方 × 市場 特徵分佈對比 ──────────────────────────
-function distShare(records, weightFn){
+function distShare(records, dimList){
   // records: [{tags, w}] → { dim: { value: sharePct } }
+  // dimList 省略時用共用維度；市場端需傳 marketAllDims() 才算得到市場專屬維度
   const out = {};
-  allCrossDims().forEach(dim=>{
+  (dimList || allCrossDims()).forEach(dim=>{
     const g = {}; let tot = 0;
     records.forEach(r=>{
       let v = r.tags[dim];
@@ -4088,9 +4248,13 @@ function renderMarketCompare(){
   const mkt = marketAll().filter(i=>i.tags).map(i=>({tags: i.tags, w: survivalDays(i.firstSeen)}));
   if(own.length<3 || mkt.length<3){
     wrap.innerHTML = `<p class="empty">需要我方 ≥3 支已標籤素材（目前 ${own.length}）＋市場 ≥3 支（目前 ${mkt.length}），對比會自動出現。</p>`;
-    gapsEl.innerHTML=''; return;
+    gapsEl.innerHTML='';
+    window.__lastCross = null;
+    // 市場專屬手法不需要我方資料，即使交叉對比未成立也可獨立呈現
+    renderMarketOnlyDims(mkt.length ? distShare(mkt, marketAllDims()) : null);
+    return;
   }
-  const dOwn = distShare(own), dMkt = distShare(mkt);
+  const dOwn = distShare(own), dMkt = distShare(mkt, marketAllDims());
   const thr = getImprThreshold();
 
   // 我方整體加權 CTR（成效基準線）
@@ -4187,7 +4351,180 @@ function renderMarketCompare(){
   gapsEl.querySelectorAll('.gapBtn').forEach(btn=>{
     btn.addEventListener('click', ()=>gapToHypo(btn.dataset.key, btn.dataset.dim));
   });
+
+  // 供「下一波素材建議」取用
+  window.__lastCross = { findings, dOwn, dMkt, overall, ownN: own.length, mktN: mkt.length, ownPerfN: ownPerf.length };
+  renderMarketOnlyDims(dMkt);
 }
+
+// ── 市場專屬手法分佈（我方沒有對應資料，因此獨立呈現、不進決策矩陣）──
+function renderMarketOnlyDims(dMkt){
+  const el = document.getElementById('mvsMarketOnly');
+  if(!el) return;
+  const mDims = getMarketDims().map(d=>d.name);
+  if(!mDims.length){ el.innerHTML=''; return; }
+  const dist = dMkt || distShare(marketAll().filter(i=>i.tags).map(i=>({tags:i.tags, w:survivalDays(i.firstSeen)})), marketAllDims());
+  const cards = mDims.map(dim=>{
+    const m = dist[dim] || {};
+    const keys = Object.keys(m).sort((a,b)=>m[b]-m[a]).slice(0,5);
+    if(!keys.length) return `<div class="moCard"><p class="moDim">${esc(dim)}</p><span style="font-size:12px; color:var(--text-muted);">市場素材尚未標註此維度，請點「⚡ 一鍵標籤市場素材」並勾選重跑</span></div>`;
+    return `<div class="moCard"><p class="moDim">${esc(dim)}</p>` + keys.map(k=>`
+      <div class="moRow">
+        <span style="width:88px; flex:none;" title="${esc(k)}">${esc(k)}</span>
+        <div class="moBarWrap"><div class="moBar" style="width:${Math.max(1,m[k]).toFixed(0)}%;"></div></div>
+        <span style="width:34px; flex:none; text-align:right; color:var(--text-secondary);">${m[k].toFixed(0)}%</span>
+      </div>`).join('') + `</div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="moBox">
+      <h3 style="font-size:14px; margin:18px 0 4px;">市場專屬手法分佈：競品在玩、我們沒做過的</h3>
+      <p class="sub" style="margin:0;">這些維度我方素材沒有對應標籤，因此不進決策矩陣、也沒有 CTR 可比——它的用途是<b>發現盲點</b>：看到市場高比例採用某手法而我們完全沒試過，就值得列為下一波的測試方向。（以存活天數加權）</p>
+      <div class="moGrid">${cards}</div>
+    </div>`;
+}
+// ══════════════════════════════════════════════════════════
+// 下一波素材建議：三方資料收斂點
+// ①我方標籤×實際成效 ②市場特徵分佈 ③市場專屬手法
+// ══════════════════════════════════════════════════════════
+function buildNextWaveContext(){
+  const cross = window.__lastCross;
+  const ownTagged = uploadedImages.filter(i=>aiResults[i.name]);
+  const ownPerf = ownTagged.filter(i=>i.matchedRow);
+  const mktTagged = marketAll().filter(i=>i.tags);
+  if(ownPerf.length < 3) return { err:'需要至少 3 支「已標籤且有成效資料」的我方素材，目前 ' + ownPerf.length + ' 支。' };
+  if(mktTagged.length < 3) return { err:'需要至少 3 支已標籤的市場素材，目前 ' + mktTagged.length + ' 支。' };
+
+  const dims = allCrossDims();
+  const mDims = getMarketDims().map(d=>d.name);
+
+  // ① 我方：每支素材的關鍵標籤 × 實際成效
+  const ownLines = ownPerf.map(i=>{
+    const t = aiResults[i.name], r = i.matchedRow;
+    const tagStr = dims.map(d=>t[d] ? `${d}=${t[d]}` : null).filter(Boolean).join('｜');
+    const ctr = r.CTR!=null ? (r.CTR*100).toFixed(2)+'%' : '-';
+    const cpa = (r.CPA!=null && isFinite(r.CPA)) ? Math.round(r.CPA) : '-';
+    return `- ${i.name}｜CTR ${ctr}｜CPA ${cpa}｜曝光 ${r.曝光||0}｜${tagStr}`;
+  }).join('\n');
+
+  // 我方特徵層級的成效彙總（加權 CTR，比逐支素材更有統計意義）
+  const totC = ownPerf.reduce((s,i)=>s+(i.matchedRow.點擊||0),0);
+  const totI = ownPerf.reduce((s,i)=>s+(i.matchedRow.曝光||0),0);
+  const overall = totI ? totC/totI : 0;
+  const thr = getImprThreshold();
+  const ownFeat = [];
+  dims.forEach(dim=>{
+    const groups = {};
+    ownPerf.forEach(i=>{
+      let v = aiResults[i.name][dim];
+      if(v==null || v==='') return;
+      v = String(v).replace(/\s*[（(]不確定[)）]\s*/g,'').trim();
+      (groups[v] = groups[v] || []).push(i);
+    });
+    Object.keys(groups).forEach(k=>{
+      const g = groups[k];
+      const c = g.reduce((s,i)=>s+(i.matchedRow.點擊||0),0);
+      const im = g.reduce((s,i)=>s+(i.matchedRow.曝光||0),0);
+      if(!im) return;
+      const ctr = c/im;
+      const lift = overall>0 ? (ctr-overall)/overall*100 : 0;
+      ownFeat.push(`- ${dim}=${k}｜${g.length} 支｜加權CTR ${(ctr*100).toFixed(2)}%（相對整體 ${lift>=0?'+':''}${lift.toFixed(0)}%）${im<thr?'｜樣本不足':''}`);
+    });
+  });
+
+  // ② 市場：共用維度的特徵分佈
+  const dMkt = (cross && cross.dMkt) || distShare(mktTagged.map(i=>({tags:i.tags, w:survivalDays(i.firstSeen)})), marketAllDims());
+  const dOwn = (cross && cross.dOwn) || distShare(ownTagged.map(i=>({tags:aiResults[i.name], w:1})));
+  const mktLines = dims.map(dim=>{
+    const m = dMkt[dim]||{}, o = dOwn[dim]||{};
+    const keys = Object.keys(m).sort((a,b)=>m[b]-m[a]).slice(0,4);
+    if(!keys.length) return null;
+    return `- ${dim}：` + keys.map(k=>`${k} 市場${m[k].toFixed(0)}%/我方${(o[k]||0).toFixed(0)}%`).join('、');
+  }).filter(Boolean).join('\n');
+
+  // ③ 市場專屬手法（我方完全沒有的維度）
+  const moLines = mDims.map(dim=>{
+    const m = dMkt[dim]||{};
+    const keys = Object.keys(m).sort((a,b)=>m[b]-m[a]).slice(0,4);
+    if(!keys.length) return null;
+    return `- ${dim}：` + keys.map(k=>`${k} ${m[k].toFixed(0)}%`).join('、');
+  }).filter(Boolean).join('\n');
+
+  // 決策矩陣結論
+  const QLABEL = { chase:'錯失的機會(市場高我方低且我方CTR佳)', trap:'市場的陷阱(市場高但我方CTR差)', moat:'我們的優勢(我方高且CTR佳)', cut:'該砍的慣性(我方高但CTR差)', untest:'尚未驗證(市場高我方無)' };
+  const findLines = (cross && cross.findings ? cross.findings : []).map(f=>
+    `- [${QLABEL[f.q]||f.q}] ${f.dim}=${f.key}｜市場 ${f.mkt.toFixed(0)}%／我方 ${f.own.toFixed(0)}%${f.ctr!=null?`｜我方CTR ${(f.ctr*100).toFixed(2)}%（${f.lift>=0?'+':''}${f.lift.toFixed(0)}%）`:'｜我方尚無此類素材'}`
+  ).join('\n');
+
+  return { ownLines, ownFeat: ownFeat.join('\n'), mktLines, moLines, findLines, overall, ownN: ownPerf.length, mktN: mktTagged.length, mDims };
+}
+
+document.getElementById('nextWaveBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('nextWaveBtn');
+  const out = document.getElementById('nwOutput');
+  const copyBtn = document.getElementById('nwCopyBtn');
+  const ctx = buildNextWaveContext();
+  if(ctx.err){ out.innerHTML = `<p class="empty">${esc(ctx.err)}</p>`; return; }
+  const extra = String(document.getElementById('nwContext').value || '').trim();
+
+  btn.disabled = true; copyBtn.style.display='none';
+  setProg('nwProgBar','nwProgText','nwProgress', 1, 3, '整理三方資料…');
+  try{
+    setProg('nwProgBar','nwProgText','nwProgress', 2, 3, 'AI 分析中…');
+    const prompt = `你是資深遊戲行銷素材策略顧問，服務對象是手遊《天堂M》的行銷團隊。請根據以下三份資料，產出「下一波素材該怎麼做」的具體建議。
+
+═══ 資料一：我方素材的實際成效（${ctx.ownN} 支，整體加權 CTR ${(ctx.overall*100).toFixed(2)}%）═══
+
+【逐支素材】
+${ctx.ownLines}
+
+【特徵層級的成效彙總】（這是最重要的證據：哪些特徵真的帶來高 CTR）
+${ctx.ownFeat || '（資料不足）'}
+
+═══ 資料二：市場競品的特徵分佈（${ctx.mktN} 支，以存活天數加權；存活越久代表越可能在跑量）═══
+${ctx.mktLines || '（資料不足）'}
+
+【工具已判定的決策矩陣結論】
+${ctx.findLines || '（尚無足夠證據形成判定）'}
+
+═══ 資料三：市場專屬手法（競品在用、我方完全沒做過，因此沒有我方成效可比）═══
+${ctx.moLines || '（尚未設定市場專屬維度或市場素材未標註）'}
+
+${extra ? `═══ 補充脈絡 ═══\n${extra}\n` : ''}
+請用繁體中文輸出，嚴格依下列結構，不要用 markdown 表格：
+
+### 一、下一波素材的製作方向（3-4 個具體方向）
+每個方向必須寫成可以直接交給設計師執行的規格：明確指出視覺特徵組合（例如「人物大小占比 40% 以上 × 暖色調 × 標題含具體數字」），並用資料一的成效數字說明為何這樣做。標明每個方向建議的素材支數佔比。
+
+### 二、該加碼與該停止的
+分「立刻加碼」與「建議停損」兩組，各列 2-3 項，每項附上依據的數據。
+
+### 三、值得測試的新手法（來自市場專屬手法）
+從資料三挑出 1-2 個競品高比例使用、我方完全沒試過的手法，說明具體怎麼做成一支測試素材，以及要觀察什麼指標來判斷成敗。若資料三為空則說明「尚無足夠市場專屬維度資料」。
+
+### 四、風險提醒
+指出上述建議中樣本數不足、或可能是相關而非因果的部分，避免過度解讀。
+
+用字精準、避免空泛的行銷術語，每一項建議都要能對應回上面的數據。`;
+
+    const txt = await callGemini([{ text: prompt }]);
+    setProg('nwProgBar','nwProgText','nwProgress', 3, 3, '完成');
+    window.__lastNextWave = txt;
+    out.innerHTML = `<div class="nwOut">${mdToCardHtml(txt, 'var(--teal)')}</div>`;
+    copyBtn.style.display = '';
+    setTimeout(()=>{ document.getElementById('nwProgress').style.display='none'; }, 900);
+  }catch(e){
+    document.getElementById('nwProgress').style.display='none';
+    out.innerHTML = `<p class="empty" style="color:var(--coral);">✗ ${esc(e.message)}</p>`;
+  }finally{ btn.disabled = false; }
+});
+document.getElementById('nwCopyBtn').addEventListener('click', ()=>{
+  const t = window.__lastNextWave || '';
+  if(!t) return;
+  const done = ()=>{ const b=document.getElementById('nwCopyBtn'); const o=b.textContent; b.textContent='✓ 已複製'; setTimeout(()=>b.textContent=o, 1500); };
+  if(navigator.clipboard) navigator.clipboard.writeText(t).then(done).catch(()=>alert('複製失敗，請手動選取'));
+  else done();
+});
+
 function gapToHypo(key, dim){
   document.getElementById('hypoDesc').value = `市場高頻特徵驗證：${dim}＝${key} 可提升 CTR`;
   document.getElementById('hypoKeyword').value = key;
@@ -4648,8 +4985,87 @@ if(/[?&]meta_inbox=1/.test(location.search)){
   if(bar){ bar.style.display=''; bar.textContent='⏳ 正在等待 Meta 書籤傳送競品素材…'; }
 }
 renderCustomDims();
+renderMarketDims();
 refreshApiUI();
 refreshApifyUI();
+initCollapsible();
+
+// ══════════════════════════════════════════════════════════
+// 通用區塊收合機制（狀態存本機）
+// 用 JS 動態包裝 <h2> 之後的內容，不改動原 HTML 結構，
+// 所有 getElementById 參照維持有效。
+// ══════════════════════════════════════════════════════════
+function initCollapsible(){
+  const state = lsGet(LS.collapse, {});
+  document.querySelectorAll('main section, .wrap section, body section').forEach((sec, idx)=>{
+    const h2 = sec.querySelector(':scope > h2');
+    if(!h2 || sec.dataset.collapsibleReady) return;
+    sec.dataset.collapsibleReady = '1';
+
+    const key = sec.id || ('sec_' + idx + '_' + (h2.textContent||'').trim().slice(0,12));
+    sec.dataset.collKey = key;
+
+    // 把 h2 之後的所有兄弟節點搬進 body 容器
+    const body = document.createElement('div');
+    body.className = 'collBody';
+    const moving = [];
+    let n = h2.nextSibling;
+    while(n){ moving.push(n); n = n.nextSibling; }
+    moving.forEach(node=>body.appendChild(node));
+    sec.appendChild(body);
+
+    // h2 改造成可點擊標題
+    h2.classList.add('collHead');
+    const caret = document.createElement('span');
+    caret.className = 'collCaret';
+    caret.textContent = '▾';
+    h2.insertBefore(caret, h2.firstChild);
+
+    const collapsed = !!state[key];
+    if(collapsed){ sec.classList.add('collapsed'); }
+
+    h2.addEventListener('click', ()=>{
+      const now = sec.classList.toggle('collapsed');
+      const st = lsGet(LS.collapse, {});
+      if(now) st[key] = 1; else delete st[key];
+      lsSet(LS.collapse, st);
+      // 展開時讓圖表重新量測尺寸（收合期間 canvas 寬度為 0）
+      if(!now && typeof Chart !== 'undefined' && Chart.getChart){
+        sec.querySelectorAll('canvas').forEach(cv=>{
+          const ch = Chart.getChart(cv);
+          if(ch){ try{ ch.resize(); }catch(e){} }
+        });
+      }
+    });
+  });
+
+  // 全域「全部展開／收合」工具列（插在第一個可收合區塊之前）
+  const first = document.querySelector('section[data-coll-key]');
+  if(first && !document.getElementById('collAllBar')){
+    const bar = document.createElement('div');
+    bar.id = 'collAllBar';
+    bar.className = 'collAllBar';
+    bar.innerHTML = '<button type="button" id="collExpandAll">全部展開</button><button type="button" id="collCollapseAll">全部收合</button>';
+    first.parentNode.insertBefore(bar, first);
+    document.getElementById('collExpandAll').addEventListener('click', ()=>setAllCollapsed(false));
+    document.getElementById('collCollapseAll').addEventListener('click', ()=>setAllCollapsed(true));
+  }
+}
+// 全部展開／收合
+function setAllCollapsed(flag){
+  const st = {};
+  document.querySelectorAll('section[data-coll-key]').forEach(sec=>{
+    sec.classList.toggle('collapsed', flag);
+    if(flag) st[sec.dataset.collKey] = 1;
+  });
+  lsSet(LS.collapse, st);
+  if(!flag && typeof Chart !== 'undefined' && Chart.getChart){
+    document.querySelectorAll('canvas').forEach(cv=>{
+      const ch = Chart.getChart(cv);
+      if(ch){ try{ ch.resize(); }catch(e){} }
+    });
+  }
+}
 </script>
 </body>
 </html>

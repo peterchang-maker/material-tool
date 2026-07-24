@@ -121,6 +121,24 @@
   .histItem button{height:26px; font-size:11.5px; padding:0 10px;}
   /* 特徵交叉驗證與素材對比 */
   .metricBar{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px;}
+  .dailyGrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px;}
+  .dailyBox{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px;}
+  .dailyBoxT{margin:0 0 10px; font-size:14px; font-weight:700; color:var(--text);}
+  .dailyRow{display:flex; align-items:center; gap:8px; margin-bottom:9px; flex-wrap:wrap;}
+  .dailyRow label{font-size:12.5px; color:var(--text-muted); width:76px; flex-shrink:0;}
+  .dailyRow input, .dailyRow textarea{font-size:13px;}
+  .dSep{color:var(--text-muted); font-size:13px;}
+  .dUnit{font-size:12px; color:var(--text-muted);}
+  .dHint{font-size:11.5px; color:var(--text-muted);}
+  .dpStat{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:14px 0 4px;}
+  .dpCard{background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:11px 13px;}
+  .dpCard .k{font-size:11.5px; color:var(--text-muted); margin-bottom:3px;}
+  .dpCard .v{font-size:19px; font-weight:700; color:var(--text);}
+  .dpCard .s{font-size:11px; margin-top:2px;}
+  .dpCard.good{background:#e9f4f1; border-color:#0f6e56;}
+  .dpCard.good .v{color:#0f6e56;}
+  .dpCard.warn{background:#fbeae5; border-color:#b3452f;}
+  .dpCard.warn .v{color:#b3452f;}
   .kpiGrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;}
   .kpiCard{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px;}
   .kpiCard .k{font-size:12px; color:var(--text-muted); margin-bottom:4px;}
@@ -575,6 +593,84 @@
       <div id="mvsGaps"></div>
     </section>
 
+    <section id="dailySection">
+      <h2>每日戰報產生器</h2>
+      <p class="sub" style="margin:0 0 14px;">填入今日數據，工具自動計算進度與差異，並可用 AI 草擬歸因與行動方案。產出可直接複製貼上或匯出圖卡。</p>
+
+      <div class="dailyGrid">
+        <div class="dailyBox">
+          <p class="dailyBoxT">① 走期與預算</p>
+          <div class="dailyRow">
+            <label>走期進度</label>
+            <input id="dpDay" type="number" min="0" placeholder="第幾天" style="width:80px;">
+            <span class="dSep">/</span>
+            <input id="dpTotalDay" type="number" min="1" placeholder="總天數" style="width:80px;">
+            <span class="dUnit">天</span>
+          </div>
+          <div class="dailyRow">
+            <label>累積花費</label>
+            <input id="dpSpent" type="number" min="0" placeholder="已花金額" style="width:120px;">
+            <span class="dSep">/</span>
+            <input id="dpBudget" type="number" min="0" placeholder="總預算" style="width:120px;">
+          </div>
+          <div class="dailyRow">
+            <label>非媒體費用</label>
+            <input id="dpNonMedia" type="number" min="0" placeholder="製作費等（選填）" style="width:150px;">
+            <span class="dHint" id="dpNonMediaHint"></span>
+          </div>
+          <div class="dailyRow">
+            <label>目標 CPA</label>
+            <input id="dpTargetCpa" type="number" min="0" placeholder="450" style="width:100px;">
+          </div>
+        </div>
+
+        <div class="dailyBox">
+          <p class="dailyBoxT">② 今日數據</p>
+          <div class="dailyRow">
+            <label>今日花費</label>
+            <input id="dpTodayCost" type="number" min="0" placeholder="今日金額" style="width:120px;">
+          </div>
+          <div class="dailyRow">
+            <label>今日導入量</label>
+            <input id="dpTodayConv" type="number" min="0" placeholder="新增人數" style="width:120px;">
+          </div>
+          <div class="dailyRow">
+            <label>昨日 CPA</label>
+            <input id="dpYestCpa" type="number" min="0" placeholder="用於算變化%" style="width:120px;">
+          </div>
+          <div class="dailyRow">
+            <label>變化主因</label>
+            <input id="dpReason" placeholder="例：調整渠道受眾 / 新素材上線" style="flex:1; min-width:180px;">
+          </div>
+        </div>
+
+        <div class="dailyBox">
+          <p class="dailyBoxT">③ 社群輿情</p>
+          <div class="dailyRow" style="align-items:flex-start;">
+            <label style="padding-top:8px;">焦點議題</label>
+            <textarea id="dpBuzz" rows="3" placeholder="巴哈 / FB 玩家熱議主題摘要" style="flex:1; min-width:200px;"></textarea>
+          </div>
+          <div class="dailyRow" style="align-items:flex-start;">
+            <label style="padding-top:8px;">順勢操作</label>
+            <textarea id="dpBuzzAction" rows="3" placeholder="例：好評明日安排迷因圖／疑慮已請小編發 FAQ" style="flex:1; min-width:200px;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls" style="margin:16px 0 8px;">
+        <button class="ghostBtn" id="dpCalcBtn">計算並產生戰報</button>
+        <button class="ghostBtn" id="dpAiBtn" style="color:var(--gold);">⚡ AI 草擬歸因與行動方案</button>
+        <button class="ghostBtn" id="dpCopyBtn" style="display:none;">複製全文</button>
+        <button class="ghostBtn" id="dpCardBtn" style="display:none;">匯出戰報圖卡（PNG）</button>
+        <span class="progressText" id="dpHint" style="margin-top:0;"></span>
+      </div>
+
+      <div id="dpAutoPanel"></div>
+      <div id="dpOutWrap" style="display:none;">
+        <textarea id="dpOut" rows="22" style="width:100%; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.65;"></textarea>
+      </div>
+    </section>
+
     <section>
       <h2>歷史庫與資料備份</h2>
       <p class="sub" style="margin:0 0 12px;">分析結果存在這台瀏覽器的 localStorage。請定期匯出 JSON 備份——換電腦、清快取都會遺失資料。也可設定 Google Apps Script 端點，把歷史庫同步到共用試算表。</p>
@@ -942,8 +1038,15 @@ function parseSheet(sheetName){
   extractAllMedia(rawBuffer).then(images=>{
     if(!images.length) return;
     // 合併進uploadedImages（避免覆蓋已手動上傳的）
+    // 去重：名稱與圖片內容都要不重複（同一張圖可能被錨定在多個分頁）
     const existingNames = new Set(uploadedImages.map(i=>i.name));
-    images.forEach(img=>{ if(!existingNames.has(img.name)) uploadedImages.push(img); });
+    const existingData = new Set(uploadedImages.map(i=>i.dataUrl));
+    images.forEach(img=>{
+      if(existingNames.has(img.name) || existingData.has(img.dataUrl)) return;
+      uploadedImages.push(img);
+      existingNames.add(img.name);          // 邊加邊更新，避免本批次內同名重複推入
+      existingData.add(img.dataUrl);
+    });
     // 切換分頁後 RAW 已更新：重新配對，且清除指向舊分頁資料的殘留配對（避免跨期數據混入分析）
     uploadedImages.forEach(img=>{
       const fresh = findMatchRow(img.name);
@@ -1289,13 +1392,18 @@ async function extractAllMedia(buffer){
       if(!zip.files[mediaPath]) continue;
 
       // 素材名稱：先找同欄鄰近列，再往左右各掃一欄（圖片與名稱可能不同欄）
-      let materialName = null;
+      // nameDist 記錄距離，供「同名多圖」時挑最靠近的那張當代表
+      let materialName = null, nameDist = null;
       outer:
       for(const dc of [0,-1,1,-2,2]){
         const cl = colLetter(Math.max(0, anchorCol+dc));
         for(const dr of [2,1,3,0,-1,4]){
           const t = cellText[`${cl}${anchorRow+dr}`];
-          if(t && t.includes('_')){ materialName = t.trim(); break outer; }
+          if(t && t.includes('_')){
+            materialName = t.trim();
+            nameDist = Math.abs(dc) * 10 + Math.abs(dr);
+            break outer;
+          }
         }
       }
 
@@ -1319,6 +1427,8 @@ async function extractAllMedia(buffer){
       byMedia[mediaPath] = {
         name: materialName || mediaFile,
         materialName,
+        mediaFile,
+        nameDist,
         sheet: sheetName,
         dataUrl,
         matchedRow
@@ -1326,7 +1436,21 @@ async function extractAllMedia(buffer){
     }
   }
 
+  // 同一個素材名稱可能被多張圖「就近」配對到（名稱搜尋範圍較寬造成）。
+  // 保留距離名稱最近的那張為代表，其餘加上檔名後綴避免同名重複顯示。
   const images = Object.values(byMedia);
+  const seenName = {};
+  images.sort((a, b) => (a.nameDist == null ? 99 : a.nameDist) - (b.nameDist == null ? 99 : b.nameDist));
+  images.forEach(img => {
+    const n = img.name;
+    if(!seenName[n]){ seenName[n] = 1; return; }
+    seenName[n]++;
+    // 第 2 張以後：名稱後面補上媒體檔名，讓使用者看得出是不同圖
+    const base = img.materialName || n;
+    const file = (img.mediaFile || '').replace(/\.[^.]+$/, '');
+    img.name = file ? `${base}#${file}` : `${base}#${seenName[n]}`;
+    img.dupOfName = base;
+  });
   return images.length ? images : await fallbackMedia(zip, VALID_EXT, MIME);
 }
 
@@ -3984,6 +4108,336 @@ document.getElementById('exportCardBtn').addEventListener('click', async ()=>{
     a.click();
   }catch(err){ alert('圖卡產生失敗：' + err.message); }
 });
+
+// ══════════════════════════════════════════════════════════
+// 每日戰報產生器
+// 設計：能自動算的（CPA、進度、標籤 Top/Bottom）自動帶入；
+//       人工才知道的（走期、預算、輿情）手動填；歸因與行動可由 AI 草擬。
+// ══════════════════════════════════════════════════════════
+const DP_KEY = 'mt_daily_draft';
+const dpEl = id => document.getElementById(id);
+const dpNum = id => { const v = parseFloat((dpEl(id).value || '').trim()); return isNaN(v) ? null : v; };
+const dpStr = id => (dpEl(id).value || '').trim();
+
+// 草稿存本機，隔天開啟不用重填走期與預算
+function dpSaveDraft(){
+  const ids = ['dpDay','dpTotalDay','dpSpent','dpBudget','dpNonMedia','dpTargetCpa',
+               'dpTodayCost','dpTodayConv','dpYestCpa','dpReason','dpBuzz','dpBuzzAction'];
+  const o = {}; ids.forEach(i=>{ o[i] = dpEl(i) ? dpEl(i).value : ''; });
+  lsSet(DP_KEY, o);
+}
+function dpLoadDraft(){
+  const o = lsGet(DP_KEY, null);
+  if(!o) return;
+  Object.keys(o).forEach(i=>{ if(dpEl(i)) dpEl(i).value = o[i]; });
+}
+
+// 從已解析資料取素材標籤表現（依 CPA，樣本量足夠者優先）
+function dpTagPerf(){
+  const snap = window.__lastPerfSnapshot;
+  if(!snap || !snap.angleWithScore || !snap.angleWithScore.length) return null;
+  const thr = getImprThreshold();
+  const pool = snap.angleWithScore.filter(a => a.cpa != null && a.impr >= thr);
+  const use = pool.length >= 2 ? pool : snap.angleWithScore.filter(a => a.cpa != null);
+  if(use.length < 1) return null;
+  const byCpa = [...use].sort((a,b) => a.cpa - b.cpa);
+  return { best: byCpa[0], worst: byCpa[byCpa.length - 1], lowSample: pool.length < 2 };
+}
+
+// 計算所有衍生數字
+function dpCompute(){
+  const day = dpNum('dpDay'), totalDay = dpNum('dpTotalDay');
+  const spent = dpNum('dpSpent'), budget = dpNum('dpBudget');
+  const nonMedia = dpNum('dpNonMedia');
+  const target = dpNum('dpTargetCpa');
+  const tCost = dpNum('dpTodayCost'), tConv = dpNum('dpTodayConv');
+  const yCpa = dpNum('dpYestCpa');
+
+  const dayPct = (day != null && totalDay) ? day / totalDay * 100 : null;
+  const budgetPct = (spent != null && budget) ? spent / budget * 100 : null;
+  const mediaCost = (spent != null && nonMedia != null) ? spent - nonMedia : null;
+  const mediaPct = (mediaCost != null && spent) ? mediaCost / spent * 100 : null;
+  const nonMediaPct = (nonMedia != null && spent) ? nonMedia / spent * 100 : null;
+  const todayCpa = (tCost != null && tConv) ? tCost / tConv : null;
+
+  // 累積 CPA：優先用手填的累積花費 ÷ 已解析資料的累積轉換
+  const snap = window.__lastPerfSnapshot;
+  let cumConv = null, cumCpa = null;
+  if(snap && Array.isArray(snap.perfData)){
+    cumConv = snap.perfData.reduce((s, r) => s + (Number(r.預約次數) || 0), 0) || null;
+  }
+  const cumCostForCpa = (mediaCost != null) ? mediaCost : spent;   // 有拆非媒體就用純媒體費算
+  if(cumCostForCpa != null && cumConv) cumCpa = cumCostForCpa / cumConv;
+
+  const cpaChange = (todayCpa != null && yCpa) ? (todayCpa - yCpa) / yCpa * 100 : null;
+  const vsTarget = (cumCpa != null && target) ? (cumCpa - target) / target * 100 : null;
+  // 預算消耗是否超前：花費比例 vs 時間比例
+  const paceGap = (budgetPct != null && dayPct != null) ? budgetPct - dayPct : null;
+
+  return { day, totalDay, dayPct, spent, budget, budgetPct, nonMedia, mediaCost, mediaPct, nonMediaPct,
+           target, tCost, tConv, todayCpa, cumConv, cumCpa, yCpa, cpaChange, vsTarget, paceGap };
+}
+
+function dpFmtMoney(v){ return v == null ? '—' : '$' + Math.round(v).toLocaleString(); }
+function dpFmtCpa(v){ return v == null ? '—' : '$' + v.toFixed(0); }
+function dpFmtPct(v, digits){ return v == null ? '—' : v.toFixed(digits == null ? 1 : digits) + '%'; }
+function dpSign(v){ return v == null ? '' : (v >= 0 ? '+' : ''); }
+
+// 上方即時統計卡
+function dpRenderStats(c){
+  const el = dpEl('dpAutoPanel');
+  const cards = [];
+  cards.push({ k:'走期進度', v: (c.day != null && c.totalDay) ? `Day ${c.day} / ${c.totalDay}` : '—',
+               s: c.dayPct != null ? `已過 ${dpFmtPct(c.dayPct, 0)}` : '' });
+  cards.push({ k:'預算使用率', v: dpFmtPct(c.budgetPct, 1),
+               s: (c.spent != null && c.budget) ? `${dpFmtMoney(c.spent)} / ${dpFmtMoney(c.budget)}` : '',
+               cls: c.paceGap != null ? (c.paceGap > 10 ? 'warn' : (c.paceGap < -10 ? 'good' : '')) : '' });
+  cards.push({ k:'今日 CPA', v: dpFmtCpa(c.todayCpa),
+               s: c.cpaChange != null ? `較昨日 ${dpSign(c.cpaChange)}${c.cpaChange.toFixed(1)}%` : '',
+               cls: c.cpaChange != null ? (c.cpaChange > 0 ? 'warn' : 'good') : '' });
+  cards.push({ k:'累積 CPA', v: dpFmtCpa(c.cumCpa),
+               s: c.vsTarget != null ? `vs 目標 ${dpSign(c.vsTarget)}${c.vsTarget.toFixed(1)}%` : (c.target ? `目標 $${c.target}` : ''),
+               cls: c.vsTarget != null ? (c.vsTarget > 0 ? 'warn' : 'good') : '' });
+  cards.push({ k:'今日導入量', v: c.tConv != null ? c.tConv.toLocaleString() : '—', s:'新增人數' });
+  el.innerHTML = `<div class="dpStat">` + cards.map(x =>
+    `<div class="dpCard${x.cls ? ' ' + x.cls : ''}">
+       <p class="k">${esc(x.k)}</p><p class="v">${esc(x.v)}</p>
+       ${x.s ? `<p class="s">${esc(x.s)}</p>` : ''}
+     </div>`).join('') + `</div>`;
+}
+
+// 組出四段式戰報文字
+function dpBuildReport(c, aiText){
+  const today = new Date().toISOString().slice(0, 10);
+  const tag = dpTagPerf();
+  const L = [];
+  L.push(`【每日戰報】${today}`);
+  L.push('');
+  L.push('1. 核心指標與預算進度');
+  L.push(`・走期進度：Day ${c.day != null ? c.day : 'X'} / ${c.totalDay != null ? c.totalDay : 'Y'}` +
+         (c.dayPct != null ? `（已過 ${dpFmtPct(c.dayPct, 0)}）` : ''));
+  let budgetLine = `・累積預算使用率：${dpFmtMoney(c.spent)} / ${dpFmtMoney(c.budget)}` +
+                   (c.budgetPct != null ? `（${dpFmtPct(c.budgetPct, 1)}）` : '');
+  if(c.nonMedia != null && c.nonMedia > 0 && c.mediaPct != null){
+    budgetLine += `　｜　媒體費 ${dpFmtPct(c.mediaPct, 0)}、非媒體費 ${dpFmtPct(c.nonMediaPct, 0)}`;
+  }
+  L.push(budgetLine);
+  if(c.paceGap != null){
+    const pace = c.paceGap > 5 ? `消耗超前時程 ${c.paceGap.toFixed(1)} 個百分點`
+              : c.paceGap < -5 ? `消耗落後時程 ${Math.abs(c.paceGap).toFixed(1)} 個百分點`
+              : '消耗與時程同步';
+    L.push(`　（${pace}）`);
+  }
+  L.push(`・今日 CPA vs 累積 CPA：${dpFmtCpa(c.todayCpa)} / ${dpFmtCpa(c.cumCpa)}` +
+         (c.target ? `（目標 CPA：$${c.target}）` : ''));
+  // 標明累積 CPA 的計算基礎：轉換數來自目前情境的已解析資料，切換情境數字會變
+  if(c.cumCpa != null){
+    const snapCtx = (window.__lastPerfSnapshot && window.__lastPerfSnapshot.ctxLabel) || '';
+    L.push(`　（累積 CPA 基數：${c.cumConv ? c.cumConv.toLocaleString() : '—'} 筆轉換` +
+           (snapCtx ? `，範圍：${snapCtx}` : '') +
+           (c.mediaCost != null ? '，已扣除非媒體費用' : '') + '）');
+  }
+  L.push(`・今日新增導入量：${c.tConv != null ? c.tConv.toLocaleString() : 'XX'} 人`);
+  L.push('');
+  L.push('2. 數據動態與歸因分析');
+  if(c.cpaChange != null){
+    L.push(`・今日成效變化：CPA 較昨日 ${c.cpaChange >= 0 ? '上升' : '下降'} ${Math.abs(c.cpaChange).toFixed(1)}%` +
+           (dpStr('dpReason') ? `，主要原因為 ${dpStr('dpReason')}。` : '。'));
+  }else{
+    L.push(`・今日成效變化：${dpStr('dpReason') || '（待填：CPA 變化與主因）'}`);
+  }
+  L.push('・素材標籤表現（Top & Bottom）：');
+  if(tag){
+    L.push(`　- 成效最佳：「${tag.best.key}」（CPA ${dpFmtCpa(tag.best.cpa)}、CTR ${(tag.best.ctr * 100).toFixed(2)}%）`);
+    L.push(`　- 待優化：「${tag.worst.key}」（CPA ${dpFmtCpa(tag.worst.cpa)}、CTR ${(tag.worst.ctr * 100).toFixed(2)}%）`);
+    if(tag.lowSample) L.push('　（註：部分切角樣本量偏低，數字僅供參考）');
+  }else{
+    L.push('　- （尚未載入成效資料，或無足夠樣本可判讀）');
+  }
+  L.push('');
+  L.push('3. 數據缺口與行動方案');
+  if(c.vsTarget != null){
+    L.push(`・當前風險：累積 CPA ${dpFmtCpa(c.cumCpa)} ${c.vsTarget >= 0 ? '高於' : '低於'} 目標 $${c.target} 約 ${Math.abs(c.vsTarget).toFixed(1)}%。`);
+  }else{
+    L.push('・當前風險：（需填入目標 CPA 才能比較）');
+  }
+  L.push('・挽救／修正計畫（明日至本週）：');
+  L.push('　- 渠道調整：');
+  L.push('　- 素材替換：');
+  L.push('　- 受眾優化：');
+  L.push('');
+  L.push('4. 社群輿情與行銷加分操作');
+  L.push(`・本日焦點議題：${dpStr('dpBuzz') || '（待填）'}`);
+  L.push(`・行銷順勢操作：${dpStr('dpBuzzAction') || '（待填）'}`);
+  let out = L.join('\n');
+  if(aiText) out = dpMergeAi(out, aiText);
+  return out;
+}
+
+// 把 AI 草擬的內容填進第 2、3 段的空白處
+function dpMergeAi(base, ai){
+  let o;
+  try{ o = typeof ai === 'string' ? JSON.parse(ai) : ai; }catch(e){ return base + '\n\n【AI 建議】\n' + ai; }
+  let out = base;
+  if(o.歸因){
+    out = out.replace('・素材標籤表現（Top & Bottom）：',
+      `・歸因分析：${o.歸因}\n・素材標籤表現（Top & Bottom）：`);
+  }
+  const plan = o.行動方案 || {};
+  if(plan.渠道調整) out = out.replace('　- 渠道調整：', `　- 渠道調整：${plan.渠道調整}`);
+  if(plan.素材替換) out = out.replace('　- 素材替換：', `　- 素材替換：${plan.素材替換}`);
+  if(plan.受眾優化) out = out.replace('　- 受眾優化：', `　- 受眾優化：${plan.受眾優化}`);
+  return out;
+}
+
+function dpRun(aiText){
+  const c = dpCompute();
+  dpRenderStats(c);
+  const txt = dpBuildReport(c, aiText);
+  dpEl('dpOut').value = txt;
+  dpEl('dpOutWrap').style.display = '';
+  dpEl('dpCopyBtn').style.display = '';
+  dpEl('dpCardBtn').style.display = '';
+  dpSaveDraft();
+  return c;
+}
+
+dpEl('dpCalcBtn').addEventListener('click', ()=>{
+  dpRun(null);
+  dpEl('dpHint').style.color = 'var(--text-secondary)';
+  dpEl('dpHint').textContent = '已產生。可直接編輯上方文字，或按 AI 草擬補上歸因與行動方案。';
+});
+
+// 非媒體費用即時顯示佔比
+dpEl('dpNonMedia').addEventListener('input', ()=>{
+  const nm = dpNum('dpNonMedia'), sp = dpNum('dpSpent');
+  dpEl('dpNonMediaHint').textContent = (nm != null && sp) ? `佔累積花費 ${(nm / sp * 100).toFixed(1)}%` : '';
+});
+
+dpEl('dpCopyBtn').addEventListener('click', async ()=>{
+  try{
+    await navigator.clipboard.writeText(dpEl('dpOut').value);
+    dpEl('dpHint').style.color = 'var(--gold)';
+    dpEl('dpHint').textContent = '✓ 已複製到剪貼簿';
+  }catch(e){
+    dpEl('dpOut').select();
+    dpEl('dpHint').textContent = '請按 Ctrl/Cmd + C 複製';
+  }
+});
+
+// AI 草擬歸因與行動方案
+dpEl('dpAiBtn').addEventListener('click', async ()=>{
+  const btn = dpEl('dpAiBtn'), hint = dpEl('dpHint');
+  if(!getApiKey()){ hint.style.color = 'var(--coral)'; hint.textContent = '請先在「AI 視覺特徵分析」設定 API Key'; return; }
+  const c = dpCompute();
+  const tag = dpTagPerf();
+  btn.disabled = true;
+  hint.style.color = 'var(--text-secondary)';
+  hint.textContent = 'AI 草擬中…';
+  try{
+    const ctx = [
+      `走期：Day ${c.day || '?'} / ${c.totalDay || '?'}`,
+      c.budgetPct != null ? `預算使用率 ${c.budgetPct.toFixed(1)}%（${dpFmtMoney(c.spent)} / ${dpFmtMoney(c.budget)}）` : '',
+      c.paceGap != null ? `消耗較時程 ${c.paceGap >= 0 ? '超前' : '落後'} ${Math.abs(c.paceGap).toFixed(1)} 個百分點` : '',
+      c.todayCpa != null ? `今日 CPA ${dpFmtCpa(c.todayCpa)}` : '',
+      c.cumCpa != null ? `累積 CPA ${dpFmtCpa(c.cumCpa)}` : '',
+      c.target ? `目標 CPA $${c.target}` : '',
+      c.vsTarget != null ? `累積 CPA 較目標 ${c.vsTarget >= 0 ? '高' : '低'} ${Math.abs(c.vsTarget).toFixed(1)}%` : '',
+      c.cpaChange != null ? `今日 CPA 較昨日 ${c.cpaChange >= 0 ? '上升' : '下降'} ${Math.abs(c.cpaChange).toFixed(1)}%` : '',
+      c.tConv != null ? `今日導入量 ${c.tConv} 人` : '',
+      dpStr('dpReason') ? `已知變化原因：${dpStr('dpReason')}` : '',
+      tag ? `成效最佳切角：${tag.best.key}（CPA ${dpFmtCpa(tag.best.cpa)}、CTR ${(tag.best.ctr*100).toFixed(2)}%）` : '',
+      tag ? `待優化切角：${tag.worst.key}（CPA ${dpFmtCpa(tag.worst.cpa)}、CTR ${(tag.worst.ctr*100).toFixed(2)}%）` : '',
+      dpStr('dpBuzz') ? `社群焦點：${dpStr('dpBuzz')}` : '',
+    ].filter(Boolean).join('\n');
+
+    const prompt = `你是遊戲買量投放的營運分析師。根據以下今日投放數據，撰寫歸因分析與具體行動方案（繁體中文，語氣專業精簡，可直接貼進戰報，不要客套話）。
+
+【今日數據】
+${ctx}
+
+要求：
+1. 歸因要講「為什麼」，結合數據推論可能原因，不要只複述數字。
+2. 行動方案要具體可執行，包含明確比例或標的（例如「將 20% 預算由 A 移至 B」）。
+3. 若數據顯示 CPA 高於目標，行動方案要以拉低 CPA 為優先。
+
+只回傳 JSON，格式如下，不要加任何說明文字或 markdown 標記：
+{"歸因":"（2-3 句話的歸因分析）","行動方案":{"渠道調整":"（一句具體做法）","素材替換":"（一句具體做法）","受眾優化":"（一句具體做法）"}}`;
+
+    const txt = await callGemini([{ text: prompt }], { json: true, timeoutMs: 60000 });
+    dpRun(txt);
+    hint.style.color = 'var(--gold)';
+    hint.textContent = '✓ AI 已草擬完成，請確認內容後再送出（數字以工具計算為準）';
+  }catch(e){
+    hint.style.color = 'var(--coral)';
+    hint.textContent = 'AI 草擬失敗：' + e.message + '（可先按「計算並產生戰報」手動填寫）';
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+// 匯出戰報圖卡
+dpEl('dpCardBtn').addEventListener('click', async ()=>{
+  const txt = dpEl('dpOut').value;
+  if(!txt.trim()){ return; }
+  const gold = '#E8C877', sub = '#9AA6BF', card = '#1A2440', line = '#2B3A5E';
+  const today = new Date().toISOString().slice(0, 10);
+  const c = dpCompute();
+  const el = document.getElementById('reportCard');
+  const stat = (k, v, s, col) => `
+    <div style="flex:1; background:${card}; border:1px solid ${line}; border-radius:12px; padding:14px 18px;">
+      <div style="font-size:12px; color:${sub};">${esc(k)}</div>
+      <div style="font-size:26px; font-weight:700; color:${col || '#F2EDE3'}; margin-top:2px;">${esc(v)}</div>
+      ${s ? `<div style="font-size:11.5px; color:${sub}; margin-top:2px;">${esc(s)}</div>` : ''}
+    </div>`;
+  const warnCol = '#C96B6B', goodCol = '#6FBF8F';
+  el.innerHTML = `
+    <div style="font-size:13px; letter-spacing:3px; color:${gold}; margin-bottom:6px;">LINEAGE M · DAILY CAMPAIGN REPORT</div>
+    <div style="font-size:30px; font-weight:700; margin-bottom:4px;">每日戰報</div>
+    <div style="font-size:14px; color:${sub}; margin-bottom:24px;">${today}${c.day != null && c.totalDay ? `　·　Day ${c.day} / ${c.totalDay}` : ''}</div>
+    <div style="display:flex; gap:14px; margin-bottom:14px;">
+      ${stat('預算使用率', dpFmtPct(c.budgetPct, 1), (c.spent != null && c.budget) ? `${dpFmtMoney(c.spent)} / ${dpFmtMoney(c.budget)}` : '', gold)}
+      ${stat('今日 CPA', dpFmtCpa(c.todayCpa), c.cpaChange != null ? `較昨日 ${dpSign(c.cpaChange)}${c.cpaChange.toFixed(1)}%` : '', c.cpaChange != null && c.cpaChange > 0 ? warnCol : goodCol)}
+      ${stat('累積 CPA', dpFmtCpa(c.cumCpa), c.vsTarget != null ? `vs 目標 ${dpSign(c.vsTarget)}${c.vsTarget.toFixed(1)}%` : '', c.vsTarget != null && c.vsTarget > 0 ? warnCol : goodCol)}
+      ${stat('今日導入量', c.tConv != null ? c.tConv.toLocaleString() : '—', '新增人數', '#F2EDE3')}
+    </div>
+    <div style="background:${card}; border:1px solid ${line}; border-radius:12px; padding:20px 24px; font-size:13.5px; line-height:1.85; color:#F2EDE3; word-break:break-word;">
+      ${dpReportToHtml(txt, gold)}
+    </div>
+    <div style="margin-top:26px; padding-top:14px; border-top:1px solid ${line}; font-size:12px; color:${sub};">天堂M 運營部 · 素材成效分析工具自動產出</div>`;
+  try{
+    const fullW = el.offsetWidth || 1080;
+    const fullH = Math.max(Math.ceil(el.scrollHeight || 0), Math.ceil(el.offsetHeight || 0),
+                           Math.ceil(el.getBoundingClientRect().height || 0), 600);
+    const canvas = await html2canvas(el, { backgroundColor:'#0E1526', scale:2, useCORS:true, allowTaint:true,
+      width: fullW, height: fullH, windowWidth: fullW, windowHeight: fullH, scrollX:0, scrollY:0 });
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `每日戰報_${today}.png`;
+    a.click();
+    dpEl('dpHint').style.color = 'var(--gold)';
+    dpEl('dpHint').textContent = '✓ 圖卡已匯出';
+  }catch(err){
+    dpEl('dpHint').style.color = 'var(--coral)';
+    dpEl('dpHint').textContent = '圖卡產生失敗：' + err.message;
+  }
+});
+
+// 戰報純文字 → 圖卡 HTML（標題、條列上色）
+function dpReportToHtml(text, gold){
+  return esc(String(text || '')).split(/\r?\n/).map(line=>{
+    const t = line.trim();
+    if(!t) return '<div style="height:9px;"></div>';
+    if(/^【.*】/.test(t)) return `<div style="font-size:15px; font-weight:700; color:${gold}; margin-bottom:8px;">${t}</div>`;
+    if(/^\d\.\s/.test(t)) return `<div style="font-size:14.5px; font-weight:700; color:${gold}; margin:14px 0 6px;">${t}</div>`;
+    if(/^・/.test(t)) return `<div style="margin:3px 0;">${t}</div>`;
+    if(/^　?-\s/.test(t)) return `<div style="margin:2px 0 2px 18px; color:#D9D3C6;">${t}</div>`;
+    return `<div style="margin:3px 0;">${t}</div>`;
+  }).join('');
+}
+
+dpLoadDraft();
+
 
 // 初始化
 loadSettings();

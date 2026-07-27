@@ -123,6 +123,14 @@
   .nwSub{font-size:12.5px; font-weight:700; margin:13px 0 7px; padding-left:9px; border-left:3px solid var(--teal);}
   .nwSec.risk .nwSub{border-left-color:var(--coral);}
   .nwOut b{color:var(--teal);}
+  /* 數字標示：這份輸出很密，讓關鍵數字在長句裡跳出來 */
+  .nwUp{color:var(--teal); font-weight:700; white-space:nowrap;}
+  .nwDown{color:var(--coral); font-weight:700; white-space:nowrap;}
+  .nwMetric{font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap;}
+  .nwLi > .t{line-height:1.75;}
+  .nwLi{padding-bottom:8px; border-bottom:1px dashed var(--border);}
+  .nwLi:last-child{border-bottom:none; padding-bottom:0;}
+  .nwSec.risk .nwUp{color:var(--coral);}
   .nwSec.risk .nwOut b, .nwSec.risk b{color:var(--coral);}
   .moBox{margin-top:18px;}
   .moGrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin-top:10px;}
@@ -4422,6 +4430,8 @@ ${extra ? `═══ 補充脈絡 ═══\n${extra}\n` : ''}
 指出上述建議中樣本數不足、或可能是相關而非因果的部分，避免過度解讀。
 
 輸出格式要求（很重要，會直接呈現給行銷團隊閱讀）：
+・【最重要】直接輸出純文字，不要包成 JSON、不要用 {} 包起來、不要加程式碼區塊（三個反引號）、不要加任何前言或結語
+・換行請直接換行，不要輸出字面上的 \\n
 ・四個大段一律用「### 一、」「### 二、」「### 三、」「### 四、」開頭，不要更動段名
 ・每個要點獨立一行，用「- 」開頭，不要把多個要點擠在同一段
 ・每個要點開頭先寫 5-12 字的重點結論，接冒號，再寫說明——讓人掃一眼就抓得到
@@ -4432,7 +4442,7 @@ ${extra ? `═══ 補充脈絡 ═══\n${extra}\n` : ''}
 
     const txt = await callGemini([{ text: prompt }]);
     setProg('nwProgBar','nwProgText','nwProgress', 3, 3, '完成');
-    window.__lastNextWave = txt;
+    window.__lastNextWave = normalizeAiText(txt);
     out.innerHTML = `<div class="nwOut">${renderAiSections(txt)}</div>`;
     copyBtn.style.display = '';
     setTimeout(()=>{ document.getElementById('nwProgress').style.display='none'; }, 900);
@@ -4486,14 +4496,80 @@ function attachListCollapse(container, key, label, count, defaultCollapsed){
 // AI 會回傳 ### 分段的 Markdown。過去直接丟進 pre-wrap 的區塊，
 // 換行被當成實體空白、段落全部黏在一起，讀起來像一坨純文字。
 // 這裡改成把每個 ### 區段切成獨立卡片，條列與粗體各自成形。
+// AI 有時會把純文字包成 JSON 或程式碼區塊回傳，直接渲染會看到 {"recommendations":"...\n..."}。
+// 這裡負責還原成乾淨的 Markdown 純文字。
+function normalizeAiText(input){
+  let s = String(input == null ? '' : input).replace(/\r/g, '').trim();
+  if(!s) return '';
+
+  // ① 去掉 ```json ... ``` 或 ``` ... ``` 外殼
+  const fence = s.match(/^```[a-zA-Z]*\s*\n?([\s\S]*?)\n?```$/);
+  if(fence) s = fence[1].trim();
+
+  // ② 若整段是 JSON，取出其中的文字內容
+  const looksJson = /^[\{\[]/.test(s);
+  if(looksJson){
+    const pick = v => {
+      if(typeof v === 'string') return v;
+      if(Array.isArray(v)) return v.map(pick).filter(Boolean).join('\n\n');
+      if(v && typeof v === 'object'){
+        // 優先取常見鍵名，否則取最長的字串值
+        const keys = ['recommendations','建議','suggestions','text','content','result','output','markdown','answer'];
+        for(const k of keys){ if(typeof v[k] === 'string' && v[k].trim()) return v[k]; }
+        const strs = Object.values(v).map(pick).filter(x=>typeof x === 'string' && x.trim());
+        if(strs.length) return strs.sort((a,b)=>b.length - a.length)[0];
+      }
+      return '';
+    };
+    try{
+      const got = pick(JSON.parse(s));
+      if(got && got.trim()) s = got;
+    }catch(e){
+      // JSON 不完整（常見於回覆被 max_tokens 截斷）→ 從第一個字串值開始取到結尾，
+      // 不能只抓「完整的引號字串」，因為被截斷的那個值正好沒有結尾引號。
+      const kv = s.match(/"[^"]+"\s*:\s*"([\s\S]*)$/);
+      if(kv){
+        let v = kv[1];
+        // 若後面還有完整結尾就切掉尾巴的 JSON 殘骸
+        const end = v.search(/"\s*[,\}]\s*$/);
+        if(end > 0) v = v.slice(0, end);
+        s = v.replace(/"\s*\}?\s*$/, '');
+      }else{
+        const m = s.match(/"((?:[^"\\]|\\.)*)"/g);
+        if(m && m.length){
+          const longest = m.sort((a,b)=>b.length - a.length)[0];
+          try{ s = JSON.parse(longest); }catch(e2){ s = longest.slice(1,-1); }
+        }
+      }
+    }
+  }
+
+  // ③ 還原字面上的跳脫字元（\n \t \" \\ 以字面形式出現時）
+  if(/\\n|\\t|\\"/.test(s)){
+    s = s.replace(/\\r\\n|\\n/g, '\n').replace(/\\t/g, '  ')
+         .replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+  }
+
+  // ④ 收尾清理：孤立的大括號、過多空行
+  s = s.replace(/^\s*[\{\[]\s*$/gm, '').replace(/^\s*[\}\]]\s*[,;]?\s*$/gm, '');
+  s = s.replace(/\n{3,}/g, '\n\n').trim();
+  return s;
+}
+
 function renderAiSections(text){
-  const raw = String(text || '').replace(/\r/g, '');
+  const raw = normalizeAiText(text);
   if(!raw.trim()) return '<p class="empty">AI 沒有回傳內容，請再試一次。</p>';
 
-  const inline = t => esc(t)
+  // 數字是這份輸出的重點，讓它在長句裡跳出來
+  const nums = h => h
+    .replace(/([＋+]\s?\d+(?:\.\d+)?\s?%)/g, '<span class="nwUp">$1</span>')
+    .replace(/([−\-]\s?\d+(?:\.\d+)?\s?%)/g, '<span class="nwDown">$1</span>')
+    .replace(/\b(CTR|CPA|CPC|CVR|CPM)\s?(\d+(?:\.\d+)?\s?%?)/g, '<span class="nwMetric">$1 $2</span>');
+
+  const inline = t => nums(esc(t)
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
     .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<i>$1</i>')
-    .replace(/^([^：:]{2,14})[：:]\s*/, '<b>$1：</b>');
+    .replace(/^([^：:]{2,16})[：:]\s*/, '<b>$1：</b>'));
 
   // 依 ### 切段；標題前的內容視為前言
   const parts = raw.split(/^\s*#{2,4}\s*/m).map(x=>x.trim()).filter(Boolean);
@@ -4515,15 +4591,30 @@ function renderAiSections(text){
 }
 
 function blockHtml(text, inline){
+  const lines = String(text || '').split(/\n/).map(x=>x.trim());
+  const isLi = t => /^(?:[-*・•]|\d+[.)、])\s+/.test(t);
+  // 下一個非空行是否為條列 → 用來判斷某行是不是小標
+  const nextIsLi = i => {
+    for(let j = i + 1; j < lines.length; j++){
+      if(!lines[j]) continue;
+      return isLi(lines[j]);
+    }
+    return false;
+  };
   const out = [];
-  String(text || '').split(/\n/).forEach(line=>{
-    const t = line.trim();
+  lines.forEach((t, i)=>{
     if(!t) return;
-    // 粗體獨佔一行 → 視為小標
+    // 粗體獨佔一行 → 小標
     const strongOnly = t.match(/^\*\*(.+?)\*\*[：:]?$/);
     if(strongOnly){ out.push(`<p class="nwSub">${esc(strongOnly[1])}</p>`); return; }
     const li = t.match(/^(?:[-*・•]|\d+[.)、])\s+(.+)$/);
     if(li){ out.push(`<div class="nwLi"><span class="b"></span><span class="t">${inline(li[1])}</span></div>`); return; }
+    // 短的獨立句、不以句讀收尾、後面接著條列 → 視為小標
+    // （AI 常寫「立刻加碼」「建議停損」這種沒有加粗的分組標題）
+    const plain = t.replace(/[（(].*?[）)]/g, '');
+    if(plain.length <= 26 && !/[。，、；：？！,.;:?!]$/.test(t) && nextIsLi(i)){
+      out.push(`<p class="nwSub">${esc(t)}</p>`); return;
+    }
     out.push(`<p class="nwP">${inline(t)}</p>`);
   });
   return out.join('') || '<p class="nwP" style="color:var(--text-muted);">（此段無內容）</p>';
@@ -4727,7 +4818,7 @@ document.getElementById('svAiBtn').addEventListener('click', async ()=>{
 
 ${lines}
 
-請用繁體中文回答三件事，不要用 markdown 表格：
+請用繁體中文回答三件事。直接輸出純文字，不要包成 JSON、不要加程式碼區塊、不要用 markdown 表格：
 
 ### 一、競品自己驗證出什麼
 從上面差異最大的幾項，歸納出「競品持續投放的素材共同長什麼樣」。用具體的視覺組合描述，不要只複述數字。
@@ -4740,7 +4831,7 @@ ${lines}
 
 用字精準，每個結論都要對應回上面的數據。`;
     const txt = await callGemini([{ text: prompt }]);
-    window.__lastSurvivalAi = txt;
+    window.__lastSurvivalAi = normalizeAiText(txt);
     out.innerHTML = `<div class="nwOut">${renderAiSections(txt)}</div>`;
   }catch(e){
     out.innerHTML = `<p class="empty" style="color:var(--coral);">✗ ${esc(e.message)}</p>`;

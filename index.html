@@ -57,6 +57,31 @@
   section.collapsed .collCaret{transform:rotate(-90deg);}
   section.collapsed > h2{margin-bottom:0;}
   section.collapsed .collBody{display:none;}
+  /* 競品自驗證 */
+  .svBox{margin-top:16px; padding:14px 16px; border:1px solid var(--teal); border-radius:8px; background:var(--teal-bg);}
+  .svMeta{display:flex; flex-wrap:wrap; gap:14px; font-size:11.5px; color:var(--text-secondary); margin-bottom:8px;}
+  .svMeta span{border:1px solid var(--border); border-radius:20px; padding:2px 10px; background:var(--card,#fff);}
+  .svTable{width:100%; border-collapse:collapse; font-size:12.5px; background:var(--card,#fff); border-radius:6px; overflow:hidden;}
+  .svTable th{text-align:left; font-weight:600; font-size:11.5px; color:var(--text-muted); padding:7px 10px; border-bottom:1px solid var(--border);}
+  .svTable td{padding:7px 10px; border-bottom:1px solid var(--border);}
+  .svTable tr:last-child td{border-bottom:none;}
+  .svBarWrap{display:inline-block; width:88px; height:7px; background:var(--border); border-radius:4px; overflow:hidden; vertical-align:middle; margin-right:7px;}
+  .svBar{height:100%;}
+  .svCaveat{margin:10px 0 0; font-size:11.5px; color:var(--text-muted); line-height:1.6;}
+  /* 競品篩選 */
+  .mkFilterBar{display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding:8px 10px; margin-bottom:10px; border:1px solid var(--border); border-radius:7px;}
+  .mkFilterLabel{font-size:12px; font-weight:600; margin-right:2px;}
+  .mkFilterBar .ghostBtn{height:26px; font-size:11.5px;}
+  .mkFilterHint{flex-basis:100%; font-size:11px; color:var(--text-muted);}
+  /* 子清單收合 */
+  .listHead{display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; padding:7px 10px; margin-bottom:6px; border:1px solid var(--border); border-radius:6px; background:rgba(0,0,0,.02); transition:border-color .15s;}
+  .listHead:hover{border-color:var(--teal);}
+  .listCaret{font-size:10px; color:var(--text-muted); transition:transform .18s ease;}
+  .listCollapsed .listCaret{transform:rotate(-90deg);}
+  .listLabel{font-size:12.5px; font-weight:600;}
+  .listCount{font-size:11.5px; color:var(--text-muted); border:1px solid var(--border); border-radius:20px; padding:1px 8px;}
+  .listHint{margin-left:auto; font-size:11px; color:var(--text-muted);}
+  .listCollapsed .listBody{display:none;}
   .mdBox{margin-top:16px; padding:14px 16px; border:1px dashed var(--border); border-radius:8px; background:rgba(91,123,181,.05);}
   .mdTitle{font-size:13.5px; font-weight:600; margin:0 0 4px;}
   .mdSub{font-size:11.5px; font-weight:400; color:var(--text-muted);}
@@ -549,6 +574,18 @@
         </label>
         <button class="ghostBtn" id="mkGenPromptBtn" style="height:34px; font-size:13px;">手動：產生市場素材 Prompt</button>
         <button class="ghostBtn" id="mkClearTaggedBtn" style="display:none;"></button>
+      </div>
+
+      <!-- 競品自驗證：用存活天數當成效代理 -->
+      <div class="svBox">
+        <p class="mdTitle">競品自驗證：長存活 vs 短存活 <span class="mdSub">看不到競品的 CTR，但看得到誰跑得久</span></p>
+        <p class="sub" style="margin:0 0 10px; font-size:12px;">把已標籤的市場素材依存活天數排序，取最長與最短的各三分之一比較特徵占比。跑很久沒下架的素材，是競品自己花預算跑出來的測試結果——這裡把它讀出來。</p>
+        <div class="controls" style="margin-bottom:8px;">
+          <button class="ghostBtn" id="svRefreshBtn">重新計算</button>
+          <button class="primaryBtn" id="svAiBtn" style="height:34px; font-size:13px;">⚡ AI 解讀差異</button>
+        </div>
+        <div id="svOutput"></div>
+        <div id="svAiOutput"></div>
       </div>
 
       <!-- 市場專屬維度：只標市場素材，用於發掘我方沒做過的手法 -->
@@ -2119,10 +2156,14 @@ function renderAiTable(){
       <button class="ghostBtn" id="compareBtn">並排對比勾選素材（2–4 張）</button>
       <span style="font-size:12px; color:var(--text-muted);">特徵值不一致的列會以底色標示，快速看出差在哪</span>
     </div>` : '';
-  wrap.innerHTML = bar + rows;
+  wrap.innerHTML = bar + `<div id="aiRowsWrap">${rows}</div>`;
   document.getElementById('compareWrap').innerHTML = ''; // 資料已變，清除舊對比結果避免誤讀
   const cb = document.getElementById('compareBtn');
   if(cb) cb.addEventListener('click', renderCompare);
+  // 明細列表獨立收合（對比控制列留在收合區外，收起後仍可操作）
+  if(uploadedImages.length) attachListCollapse(
+    document.getElementById('aiRowsWrap'), 'aiRows', '素材標籤明細',
+    `${uploadedImages.length} 支`, uploadedImages.length > 6);
   renderFeatureCross();
   renderMarketCompare();
 }
@@ -2802,7 +2843,7 @@ function refreshApiUI(){
   badge.className = 'apiBadge ' + (on ? 'on' : 'off');
   // AI 按鈕：一律顯示（讓使用者知道有這些功能），未設定 API Key 時停用並提示
   // —— 過去是直接隱藏，導致「功能突然不見」的困惑。
-  ['autoAnalyzeBtn','mkAutoTagBtn','cdSuggestBtn','mdSuggestBtn','nextWaveBtn','aiReportBtn'].forEach(id=>{
+  ['autoAnalyzeBtn','mkAutoTagBtn','cdSuggestBtn','mdSuggestBtn','nextWaveBtn','svAiBtn','aiReportBtn'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
     el.style.display = '';
@@ -2816,7 +2857,7 @@ function refreshApiUI(){
   const aa = document.getElementById('autoAnalyzeBtn');
   // 一鍵分析另有「要有圖片」的條件，兩者皆須滿足才可按
   if(aa) aa.disabled = !on || uploadedImages.length === 0;
-  ['mkAutoTagBtn','cdSuggestBtn','mdSuggestBtn','nextWaveBtn','aiReportBtn'].forEach(id=>{
+  ['mkAutoTagBtn','cdSuggestBtn','mdSuggestBtn','nextWaveBtn','svAiBtn','aiReportBtn'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.disabled = !on;
   });
@@ -3053,18 +3094,39 @@ document.getElementById('mkAutoTagBtn').addEventListener('click', async ()=>{
 document.getElementById('cdSuggestBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('cdSuggestBtn');
   const wrap = document.getElementById('cdSuggestWrap');
-  const samples = uploadedImages.filter(i=>imgPart(i.dataUrl)).slice(0, 4);
+  // 從成效反推：只餵 CTR 最高與最低兩組，讓 AI 找出「區分成效」的維度，
+  // 而不是無監督地看一批圖亂想。資料不足時退回原本的取樣模式。
+  const perf = uploadedImages.filter(i=>imgPart(i.dataUrl) && i.matchedRow && i.matchedRow.CTR != null)
+                             .sort((a,b)=>b.matchedRow.CTR - a.matchedRow.CTR);
+  const useSplit = perf.length >= 6;
+  const k = useSplit ? Math.max(2, Math.min(3, Math.floor(perf.length / 5))) : 0;
+  const hi = useSplit ? perf.slice(0, k) : [];
+  const lo = useSplit ? perf.slice(-k) : [];
+  const samples = useSplit ? hi.concat(lo) : uploadedImages.filter(i=>imgPart(i.dataUrl)).slice(0, 4);
   btn.disabled = true;
-  wrap.innerHTML = '<span class="progressText">AI 思考中…</span>';
+  wrap.innerHTML = `<span class="progressText">${useSplit ? 'AI 比對高低成效兩組素材…' : 'AI 思考中…'}</span>`;
   try{
     const existing = allCrossDims().join('、');
-    const parts = [{ text: `你是遊戲行銷素材分析師。我們目前分析素材時已使用這些維度：
+    const pct = v => (v*100).toFixed(2) + '%';
+    const head = useSplit
+      ? `你是遊戲行銷素材分析師。我們目前分析素材時已使用這些維度：
+${existing}
+
+以下附上我們實際投放的素材圖片，分成兩組：
+・前 ${hi.length} 張是 CTR 最高的素材（${pct(hi[hi.length-1].matchedRow.CTR)} ～ ${pct(hi[0].matchedRow.CTR)}）
+・後 ${lo.length} 張是 CTR 最低的素材（${pct(lo[lo.length-1].matchedRow.CTR)} ～ ${pct(lo[0].matchedRow.CTR)}）
+
+請找出這兩組在視覺上的關鍵差異，並提議 3 個「現有維度描述不到、但能區分這兩組」的新分析維度。
+重點：提議的維度必須是能解釋成效落差的，不要提議你覺得有趣但兩組都一樣的特徵。
+每個維度要能用少數幾個離散選項描述（方便統計占比）。`
+      : `你是遊戲行銷素材分析師。我們目前分析素材時已使用這些維度：
 ${existing}
 
 ${samples.length ? '以下附上幾張我們實際投放的素材圖片作為參考。' : ''}
-請提議 3 個「目前沒有、但對手遊廣告成效分析有價值」的新分析維度。每個維度要能用少數幾個離散選項描述（方便統計占比）。
+請提議 3 個「目前沒有、但對手遊廣告成效分析有價值」的新分析維度。每個維度要能用少數幾個離散選項描述（方便統計占比）。`;
+    const parts = [{ text: `${head}
 
-只回傳 JSON：{"維度":[{"name":"維度名稱(20字內)","hint":"選項A或選項B或選項C","why":"一句話說明為何值得追蹤(30字內)"}]}` }];
+只回傳 JSON：{"維度":[{"name":"維度名稱(20字內)","hint":"選項A或選項B或選項C","why":"一句話說明${useSplit ? '這個維度如何區分高低成效兩組' : '為何值得追蹤'}(40字內)"}]}` }];
     samples.forEach(img=>{ const p = imgPart(img.dataUrl); if(p) parts.push(p); });
     const txt = await callGemini(parts);
     const p = parseJsonSafe(txt);
@@ -3234,22 +3296,37 @@ document.getElementById('mdSuggestBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('mdSuggestBtn');
   const wrap = document.getElementById('mdSuggestWrap');
   // 關鍵：只餵競品素材給 AI，讓它從競品角度提議我們沒有的維度
-  const samples = marketAll().filter(i=>imgPart(i.dataUrl)).slice(0, 6);
+  // 同樣採監督式取樣：長存活 vs 短存活兩組，讓提議的維度天生與成效相關
+  const pool = marketScope().filter(i=>imgPart(i.dataUrl));
+  const withSv = pool.filter(hasSurvival).map(i=>({ it:i, d:survivalDaysOf(i) })).sort((a,b)=>b.d - a.d);
+  const useSplit = withSv.length >= 6;
+  const k = useSplit ? Math.max(2, Math.min(3, Math.floor(withSv.length / 3))) : 0;
+  const lng = useSplit ? withSv.slice(0, k).map(x=>x.it) : [];
+  const shr = useSplit ? withSv.slice(-k).map(x=>x.it) : [];
+  const samples = useSplit ? lng.concat(shr) : pool.slice(0, 6);
   if(!samples.length){ alert('請先加入市場素材圖片（需有實際圖片內容，僅連結無法分析）'); return; }
   btn.disabled = true;
-  wrap.innerHTML = '<span class="progressText">AI 只看競品素材、思考中…</span>';
+  wrap.innerHTML = `<span class="progressText">${useSplit ? 'AI 比對長短存活兩組競品素材…' : 'AI 只看競品素材、思考中…'}</span>`;
   try{
     const existing = marketAllDims().join('、');
     const games = [...new Set(samples.map(i=>i.game).filter(Boolean))].join('、');
+    const splitNote = useSplit
+      ? `這些素材分成兩組：
+・前 ${lng.length} 張是存活最久的（${survivalDaysOf(lng[lng.length-1])}–${survivalDaysOf(lng[0])} 天，競品持續投放）
+・後 ${shr.length} 張是存活最短的（${survivalDaysOf(shr[shr.length-1])}–${survivalDaysOf(shr[0])} 天，很快下架）
+
+請優先找出「長存活組有、短存活組沒有」的手法——那是競品自己驗證過有效的。
+`
+      : '';
     const parts = [{ text: `你是遊戲行銷素材分析師。以下是「市場上其他遊戲」的廣告素材${games ? `（${games}）` : ''}。
 
-我們目前分析素材時已使用這些維度：
+${splitNote}我們目前分析素材時已使用這些維度：
 ${existing}
 
 請「只根據這些競品素材」，提議 3 個目前清單裡完全沒有、但這些競品明顯在使用的視覺或訴求手法維度。重點是找出「我們自己從來沒做過、所以現有維度描述不到」的特徵——不要提議現有維度的同義改寫。
 每個維度要能用少數幾個離散選項描述（方便統計占比）。
 
-只回傳 JSON：{"維度":[{"name":"維度名稱(20字內)","hint":"選項A或選項B或選項C","why":"一句話說明這在競品素材上如何呈現、為何值得追蹤(40字內)"}]}` }];
+只回傳 JSON：{"維度":[{"name":"維度名稱(20字內)","hint":"選項A或選項B或選項C","why":"一句話說明${useSplit ? '這個手法在長存活組如何呈現' : '這在競品素材上如何呈現、為何值得追蹤'}(40字內)"}]}` }];
     samples.forEach(img=>{ const p = imgPart(img.dataUrl); if(p) parts.push(p); });
     const txt = await callGemini(parts);
     const p = parseJsonSafe(txt);
@@ -3341,6 +3418,22 @@ function shrinkImage(dataUrl, maxPx, quality){
 
 let MARKET = [];               // 記憶體中的完整資料（含 dataUrl）
 function marketAll(){ return MARKET; }
+// ── 競品篩選：分開看，別混在一起算 ──
+// 混算會得到一個「平均競品」——天堂W 與 MapleStory 的策略互相稀釋，
+// 反而看不出誰跟我們最像、誰走差異化。
+LS.mktGame = 'mt_mk_game';
+function mktScopeName(){ return lsGet(LS.mktGame, ''); }
+function marketScope(){
+  const g = mktScopeName();
+  return g ? MARKET.filter(i=>i.game===g) : MARKET;
+}
+function marketGames(){
+  return [...new Set(MARKET.map(i=>i.game).filter(Boolean))].sort();
+}
+function scopeLabel(){
+  const g = mktScopeName();
+  return g ? g : '全部競品';
+}
 function marketMeta(arr){      // 寫入 localStorage 的版本：不含圖片
   return arr.map(m=>{ const o = Object.assign({}, m); delete o.dataUrl; return o; });
 }
@@ -3373,12 +3466,21 @@ async function initMarket(){
   if(migrated){ try{ lsSet(LS.market, marketMeta(MARKET)); }catch(e){} }
   renderMarketList();
 }
-function survivalDays(firstSeen){
-  if(!firstSeen) return 1;
-  const ts = new Date(firstSeen).getTime();
-  if(isNaN(ts)) return 1; // 無效日期 → 權重 1，避免 NaN 毒化分佈
-  const d = Math.round((Date.now() - ts)/86400000);
-  return Math.max(1, Math.min(120, d));
+// 素材實際存活區間：末次見到（或加入本庫當天）− 首見日。
+// 舊版一律用「至今」計算，素材下架後天數仍會持續累加而失真；
+// 改用 lastSeen 後，只有在重新抓取時再次見到才會延長，才是真的存活長度。
+function survivalDaysOf(it){
+  if(!it || !it.firstSeen) return 1;
+  const a = new Date(it.firstSeen).getTime();
+  if(isNaN(a)) return 1;
+  const endStr = it.lastSeen || it.addedAt || null;
+  let b = endStr ? new Date(endStr).getTime() : Date.now();
+  if(isNaN(b)) b = Date.now();
+  return Math.max(1, Math.min(365, Math.round((b - a)/86400000)));
+}
+// 存活天數是否可信：需有合法首見日，否則不納入長短存活對比
+function hasSurvival(it){
+  return !!(it && it.firstSeen && !isNaN(new Date(it.firstSeen).getTime()));
 }
 // 來源格式自動識別：Apify（任何 Actor）/ 書籤擷取檔 / Google 表單
 // 不同 Actor 的欄位名差異極大，因此不寫死欄位名——遞迴掃描整筆資料找出可用內容
@@ -3462,15 +3564,23 @@ function mergeMarketItems(rawItems, defaultSource){
   const items = marketAll();
   const ids = new Set(items.map(i=>i.id));
   let added = 0, skipped = 0;
+  const today = new Date().toISOString().slice(0,10);
+  const byId = new Map(items.map(x=>[String(x.id), x]));
   (rawItems||[]).forEach(it=>{
-    if(!it || !it.id || ids.has(String(it.id))){ skipped++; return; }
+    if(!it || !it.id) { skipped++; return; }
+    if(ids.has(String(it.id))){
+      // 同一支素材再次被抓到 → 更新末次見到日，存活天數才會反映真實投放長度
+      const ex = byId.get(String(it.id));
+      if(ex) ex.lastSeen = today;
+      skipped++; return;
+    }
     const b64 = String(it.imageBase64||'').replace(/[^A-Za-z0-9+/=]/g,'');
     const mime = /^image\/(jpeg|png|gif|webp)$/.test(String(it.mime)) ? it.mime : 'image/jpeg';
     items.push({
       id: String(it.id),
       name: it.name || `市場_${it.game||'未命名'}_${it.id}`,
       game: it.game || '未命名', source: it.source || defaultSource,
-      firstSeen: it.firstSeen || '', addedAt: new Date().toISOString().slice(0,10),
+      firstSeen: it.firstSeen || '', addedAt: today, lastSeen: today,
       dataUrl: b64 ? `data:${mime};base64,${b64}` : 'data:,',  // 大圖會在 marketSave 後由 compactMarketImages 壓縮
       imageUrl: (typeof it.imageUrl==='string' && /^https:\/\//.test(it.imageUrl)) ? it.imageUrl : null,
       adUrl: (typeof it.adUrl==='string' && /^https:\/\//.test(it.adUrl)) ? it.adUrl : null,
@@ -3501,8 +3611,9 @@ async function compactMarketImages(){
 
 function renderMarketList(){
   const list = document.getElementById('mkList');
-  const items = marketAll();
-  if(!items.length){ list.innerHTML = '<p class="empty">尚無市場素材。填好遊戲名稱與首見日期後選擇圖片加入。</p>'; return; }
+  const all = marketAll();
+  if(!all.length){ list.innerHTML = '<p class="empty">尚無市場素材。填好遊戲名稱與首見日期後選擇圖片加入。</p>'; return; }
+  const items = marketScope();
   const tagged = items.filter(i=>i.tags).length;
   const dims = marketAllDims();   // 共用18維 ＋ 我方自訂 ＋ 市場專屬
   const view = lsGet(LS.mkView, 'compact');
@@ -3511,9 +3622,19 @@ function renderMarketList(){
   let missing = 0;
   items.forEach(it=>{ if(it.tags && dims.some(d=>it.tags[d]==null || it.tags[d]==='')) missing++; });
 
-  const head = `
+  const games = marketGames();
+  const cur = mktScopeName();
+  const filterBar = games.length > 1 ? `
+    <div class="mkFilterBar">
+      <span class="mkFilterLabel">分析範圍</span>
+      <button class="ghostBtn mkGameBtn" data-g="" style="${!cur?'border-color:var(--teal); color:var(--teal);':''}">全部競品 (${all.length})</button>
+      ${games.map(g=>`<button class="ghostBtn mkGameBtn" data-g="${esc(g)}" style="${cur===g?'border-color:var(--teal); color:var(--teal);':''}">${esc(g)} (${all.filter(i=>i.game===g).length})</button>`).join('')}
+      <span class="mkFilterHint">${cur ? `目前只分析「${esc(cur)}」——下方所有統計、交叉對比與 AI 建議都只看這個競品` : '混合全部競品會得到一個「平均競品」，不同遊戲的策略會互相稀釋'}</span>
+    </div>` : '';
+
+  const head = filterBar + `
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-      <span style="font-size:12.5px; color:var(--text-secondary);">共 ${items.length} 支市場素材，已標籤 ${tagged} 支（共用 ${allCrossDims().length} 維與我方相同${getMarketDims().length ? ` ＋ 市場專屬 ${getMarketDims().length} 維` : ''}）</span>
+      <span style="font-size:12.5px; color:var(--text-secondary);">${cur ? `「${esc(cur)}」` : '全部競品'} 共 ${items.length} 支市場素材，已標籤 ${tagged} 支（共用 ${allCrossDims().length} 維與我方相同${getMarketDims().length ? ` ＋ 市場專屬 ${getMarketDims().length} 維` : ''}）</span>
       <span>
         <button class="ghostBtn mkViewBtn" data-v="compact" style="height:26px; font-size:11.5px; ${view==='compact'?'border-color:var(--teal); color:var(--teal);':''}">摘要</button>
         <button class="ghostBtn mkViewBtn" data-v="full" style="height:26px; font-size:11.5px; ${view==='full'?'border-color:var(--teal); color:var(--teal);':''}">完整 ${dims.length} 維</button>
@@ -3524,7 +3645,7 @@ function renderMarketList(){
   const body = items.map((it,i)=>{
     const t = it.tags;
     const img = it.dataUrl && it.dataUrl!=='data:,' ? it.dataUrl : (it.imageUrl ? esc(it.imageUrl) : 'data:,');
-    const meta = `${esc(it.source)||'-'} · 首見 ${esc(it.firstSeen)||'-'} · 存活 ${survivalDays(it.firstSeen)} 天${it.adUrl ? ` · <a href="${esc(it.adUrl)}" target="_blank" rel="noopener noreferrer">原始廣告↗</a>` : ''}`;
+    const meta = `${esc(it.source)||'-'} · 首見 ${esc(it.firstSeen)||'-'} · 存活 ${survivalDaysOf(it)} 天${it.adUrl ? ` · <a href="${esc(it.adUrl)}" target="_blank" rel="noopener noreferrer">原始廣告↗</a>` : ''}`;
     let tagHtml;
     if(!t){
       tagHtml = '<span style="color:var(--text-muted); font-size:12px;">待分析</span>';
@@ -3547,24 +3668,33 @@ function renderMarketList(){
           <p style="margin:0 0 3px; font-size:12.5px;"><b>${esc(it.game)}</b>　<span class="mkMeta">${meta}</span></p>
           ${tagHtml}
         </div>
-        <button class="ghostBtn mkDelBtn" data-i="${i}" style="height:26px; font-size:11.5px; flex-shrink:0;">刪除</button>
+        <button class="ghostBtn mkDelBtn" data-id="${esc(String(it.id))}" style="height:26px; font-size:11.5px; flex-shrink:0;">刪除</button>
       </div>`;
   }).join('');
 
-  list.innerHTML = head + body;
+  list.innerHTML = head + `<div id="mkRowsWrap">${body}</div>`;
+  // 素材列表獨立收合（統計、檢視切換、缺漏警示留在收合區外）
+  attachListCollapse(document.getElementById('mkRowsWrap'), 'mkRows', '市場素材清單',
+    `${items.length} 支`, items.length > 6);
   list.querySelectorAll('.mkViewBtn').forEach(b=>b.addEventListener('click', ()=>{
     lsSet(LS.mkView, b.dataset.v); renderMarketList();
   }));
-  list.querySelectorAll('.mkDelBtn').forEach(b=>b.addEventListener('click', ()=>mkDelete(+b.dataset.i)));
+  list.querySelectorAll('.mkGameBtn').forEach(b=>b.addEventListener('click', ()=>{
+    lsSet(LS.mktGame, b.dataset.g || ''); renderMarketList(); renderSurvivalSplit();
+  }));
+  list.querySelectorAll('.mkDelBtn').forEach(b=>b.addEventListener('click', ()=>mkDelete(b.dataset.id)));
   renderMarketCompare();
+  renderSurvivalSplit();
   if(typeof updateStorageHint==='function') updateStorageHint();
 }
-function mkDelete(i){
+// 以 id 刪除：清單會依競品篩選，用陣列索引會刪到錯的素材
+function mkDelete(id){
   const items = marketAll();
-  if(!confirm(`刪除市場素材「${items[i]?.game} #${i+1}」？`)) return;
-  const gone = items[i];
-  if(gone) idbDel(gone.id).catch(()=>{});
-  items.splice(i,1); marketSave(items); renderMarketList();
+  const idx = items.findIndex(x=>String(x.id) === String(id));
+  if(idx < 0) return;
+  if(!confirm(`刪除市場素材「${items[idx].game}」？`)) return;
+  idbDel(items[idx].id).catch(()=>{});
+  items.splice(idx,1); marketSave(items); renderMarketList(); renderSurvivalSplit();
 }
 document.getElementById('mkUploadBtn').addEventListener('click', ()=>{
   if(!document.getElementById('mkGame').value.trim()){ alert('請先填遊戲名稱'); return; }
@@ -4245,7 +4375,7 @@ function renderMarketCompare(){
   const ownTagged = uploadedImages.filter(i=>aiResults[i.name]);
   const ownPerf = ownTagged.filter(i=>i.matchedRow);
   const own = ownTagged.map(i=>({tags: aiResults[i.name], w:1}));
-  const mkt = marketAll().filter(i=>i.tags).map(i=>({tags: i.tags, w: survivalDays(i.firstSeen)}));
+  const mkt = marketScope().filter(i=>i.tags).map(i=>({tags: i.tags, w: survivalDaysOf(i)}));
   if(own.length<3 || mkt.length<3){
     wrap.innerHTML = `<p class="empty">需要我方 ≥3 支已標籤素材（目前 ${own.length}）＋市場 ≥3 支（目前 ${mkt.length}），對比會自動出現。</p>`;
     gapsEl.innerHTML='';
@@ -4363,7 +4493,7 @@ function renderMarketOnlyDims(dMkt){
   if(!el) return;
   const mDims = getMarketDims().map(d=>d.name);
   if(!mDims.length){ el.innerHTML=''; return; }
-  const dist = dMkt || distShare(marketAll().filter(i=>i.tags).map(i=>({tags:i.tags, w:survivalDays(i.firstSeen)})), marketAllDims());
+  const dist = dMkt || distShare(marketScope().filter(i=>i.tags).map(i=>({tags:i.tags, w:survivalDaysOf(i)})), marketAllDims());
   const cards = mDims.map(dim=>{
     const m = dist[dim] || {};
     const keys = Object.keys(m).sort((a,b)=>m[b]-m[a]).slice(0,5);
@@ -4390,7 +4520,7 @@ function buildNextWaveContext(){
   const cross = window.__lastCross;
   const ownTagged = uploadedImages.filter(i=>aiResults[i.name]);
   const ownPerf = ownTagged.filter(i=>i.matchedRow);
-  const mktTagged = marketAll().filter(i=>i.tags);
+  const mktTagged = marketScope().filter(i=>i.tags);
   if(ownPerf.length < 3) return { err:'需要至少 3 支「已標籤且有成效資料」的我方素材，目前 ' + ownPerf.length + ' 支。' };
   if(mktTagged.length < 3) return { err:'需要至少 3 支已標籤的市場素材，目前 ' + mktTagged.length + ' 支。' };
 
@@ -4432,7 +4562,7 @@ function buildNextWaveContext(){
   });
 
   // ② 市場：共用維度的特徵分佈
-  const dMkt = (cross && cross.dMkt) || distShare(mktTagged.map(i=>({tags:i.tags, w:survivalDays(i.firstSeen)})), marketAllDims());
+  const dMkt = (cross && cross.dMkt) || distShare(mktTagged.map(i=>({tags:i.tags, w:survivalDaysOf(i)})), marketAllDims());
   const dOwn = (cross && cross.dOwn) || distShare(ownTagged.map(i=>({tags:aiResults[i.name], w:1})));
   const mktLines = dims.map(dim=>{
     const m = dMkt[dim]||{}, o = dOwn[dim]||{};
@@ -4523,6 +4653,165 @@ document.getElementById('nwCopyBtn').addEventListener('click', ()=>{
   const done = ()=>{ const b=document.getElementById('nwCopyBtn'); const o=b.textContent; b.textContent='✓ 已複製'; setTimeout(()=>b.textContent=o, 1500); };
   if(navigator.clipboard) navigator.clipboard.writeText(t).then(done).catch(()=>alert('複製失敗，請手動選取'));
   else done();
+});
+
+// ── 子清單收合：區塊內的長列表（素材明細、市場素材清單）──
+// 區塊層級的收合會連控制項一起藏起來；真正佔版面的是這些列表本身，
+// 因此獨立給它一個收合開關，狀態同樣存本機。
+function attachListCollapse(container, key, label, count, defaultCollapsed){
+  if(!container) return;
+  const stKey = 'list:' + key;
+  const st = lsGet(LS.collapse, {});
+  const collapsed = (stKey in st) ? !!st[stKey] : !!defaultCollapsed;
+
+  const body = document.createElement('div');
+  body.className = 'listBody';
+  while(container.firstChild) body.appendChild(container.firstChild);
+
+  const head = document.createElement('div');
+  head.className = 'listHead';
+  head.innerHTML = `<span class="listCaret">▾</span>`
+    + `<span class="listLabel">${esc(label)}</span>`
+    + `<span class="listCount">${count}</span>`
+    + `<span class="listHint"></span>`;
+  container.appendChild(head);
+  container.appendChild(body);
+  container.classList.toggle('listCollapsed', collapsed);
+  head.querySelector('.listHint').textContent = collapsed ? '已收合，點擊展開' : '點擊收合';
+
+  head.addEventListener('click', ()=>{
+    const now = container.classList.toggle('listCollapsed');
+    const s2 = lsGet(LS.collapse, {});
+    s2[stKey] = now ? 1 : 0;
+    lsSet(LS.collapse, s2);
+    head.querySelector('.listHint').textContent = now ? '已收合，點擊展開' : '點擊收合';
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// 競品自驗證：長存活 vs 短存活
+// 我們看不到競品的 CTR，但看得到哪些素材跑很久、哪些很快消失。
+// 這中間的差異，是競品自己花錢跑出來的 A/B 測試結果。
+// ══════════════════════════════════════════════════════════
+function buildSurvivalSplit(){
+  const pool = marketScope().filter(i=>i.tags && hasSurvival(i));
+  if(pool.length < 6) return { err:`需要至少 6 支「已標籤且有首見日期」的市場素材，${scopeLabel()}目前 ${pool.length} 支。` };
+
+  const sorted = pool.map(i=>({ it:i, d:survivalDaysOf(i) })).sort((a,b)=>b.d - a.d);
+  // 取頭尾各三分之一，中間段捨去——中間的訊號最模糊，納入只會稀釋差異
+  const n = Math.max(3, Math.floor(sorted.length / 3));
+  const long = sorted.slice(0, n);
+  const short = sorted.slice(-n);
+  if(long[long.length-1].d <= short[0].d){
+    return { err:'長短兩組的存活天數沒有區隔（可能素材首見日期都相近），無法比較。' };
+  }
+
+  const dims = marketAllDims();
+  const dl = distShare(long.map(x=>({tags:x.it.tags, w:1})), dims);
+  const ds = distShare(short.map(x=>({tags:x.it.tags, w:1})), dims);
+
+  const rows = [];
+  dims.forEach(dim=>{
+    const L = dl[dim] || {}, S = ds[dim] || {};
+    new Set([...Object.keys(L), ...Object.keys(S)]).forEach(k=>{
+      const l = L[k] || 0, sh = S[k] || 0;
+      const diff = l - sh;
+      if(Math.abs(diff) >= 15) rows.push({ dim, key:k, long:l, short:sh, diff });
+    });
+  });
+  rows.sort((a,b)=>Math.abs(b.diff) - Math.abs(a.diff));
+
+  return {
+    rows, n,
+    longDays: [long[long.length-1].d, long[0].d],
+    shortDays: [short[short.length-1].d, short[0].d],
+    total: pool.length
+  };
+}
+
+function renderSurvivalSplit(){
+  const el = document.getElementById('svOutput');
+  if(!el) return;
+  const r = buildSurvivalSplit();
+  const btn = document.getElementById('svAiBtn');
+  if(r.err){
+    el.innerHTML = `<p class="empty">${esc(r.err)}</p>`;
+    if(btn) btn.disabled = true;
+    return;
+  }
+  if(btn) btn.disabled = !hasApi();
+  window.__lastSurvival = r;
+
+  if(!r.rows.length){
+    el.innerHTML = `<p class="empty">長短存活兩組在各維度上沒有明顯差異（門檻：占比差 15 個百分點以上）。這本身也是一種結論——${esc(scopeLabel())}的素材成效差異可能不來自這些視覺特徵。</p>`;
+    return;
+  }
+
+  const top = r.rows.slice(0, 8);
+  el.innerHTML = `
+    <div class="svMeta">
+      <span>長存活組 ${r.n} 支・${r.longDays[0]}–${r.longDays[1]} 天</span>
+      <span>短存活組 ${r.n} 支・${r.shortDays[0]}–${r.shortDays[1]} 天</span>
+      <span>樣本池 ${r.total} 支（${esc(scopeLabel())}）</span>
+    </div>
+    <table class="svTable">
+      <thead><tr><th>維度</th><th>特徵值</th><th style="text-align:right;">長存活</th><th style="text-align:right;">短存活</th><th style="width:150px;">差距</th></tr></thead>
+      <tbody>${top.map(x=>{
+        const pos = x.diff > 0;
+        const w = Math.min(100, Math.abs(x.diff));
+        return `<tr>
+          <td style="color:var(--text-muted);">${esc(x.dim)}</td>
+          <td><b>${esc(x.key)}</b></td>
+          <td style="text-align:right;">${x.long.toFixed(0)}%</td>
+          <td style="text-align:right;">${x.short.toFixed(0)}%</td>
+          <td>
+            <div class="svBarWrap"><div class="svBar" style="width:${w}%; background:${pos?'var(--teal)':'var(--coral)'};"></div></div>
+            <span style="font-size:11.5px; color:${pos?'var(--teal)':'var(--coral)'};">${pos?'+':''}${x.diff.toFixed(0)} pt</span>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>
+    <p class="svCaveat">⚠ 存活天數是噪音很大的代理指標：檔期結束、預算重分配都會讓素材下架，不必然代表成效差。這裡的結論請當成「疑似有效」的待驗證假設，不是定論。</p>`;
+}
+
+document.getElementById('svRefreshBtn').addEventListener('click', ()=>{
+  document.getElementById('svAiOutput').innerHTML = '';
+  renderSurvivalSplit();
+});
+document.getElementById('svAiBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('svAiBtn');
+  const out = document.getElementById('svAiOutput');
+  const r = window.__lastSurvival;
+  if(!r || r.err || !r.rows || !r.rows.length){ out.innerHTML = '<p class="empty">目前沒有足夠的差異可供解讀。</p>'; return; }
+  btn.disabled = true;
+  out.innerHTML = '<span class="progressText">AI 解讀中…</span>';
+  try{
+    const lines = r.rows.slice(0, 12).map(x=>
+      `- ${x.dim}=${x.key}｜長存活組 ${x.long.toFixed(0)}%／短存活組 ${x.short.toFixed(0)}%（差 ${x.diff>0?'+':''}${x.diff.toFixed(0)} 個百分點）`).join('\n');
+    const prompt = `你是遊戲行銷素材分析師。以下是競品《${scopeLabel()}》廣告素材的一項分析。
+
+我們無法取得競品的 CTR，但可以觀察每支素材的存活天數。把已標籤素材依存活天數排序後，取最長的 ${r.n} 支（${r.longDays[0]}–${r.longDays[1]} 天）與最短的 ${r.n} 支（${r.shortDays[0]}–${r.shortDays[1]} 天），比較兩組的視覺特徵占比差異：
+
+${lines}
+
+請用繁體中文回答三件事，不要用 markdown 表格：
+
+### 一、競品自己驗證出什麼
+從上面差異最大的幾項，歸納出「競品持續投放的素材共同長什麼樣」。用具體的視覺組合描述，不要只複述數字。
+
+### 二、我方可以怎麼用
+針對其中 2-3 項，說明我方下一波可以怎麼測試，以及要觀察什麼指標判斷成敗。
+
+### 三、這個推論的弱點
+明確指出哪些項目可能是假訊號——例如樣本太少、或該特徵可能只是反映檔期／素材類型而非成效。不要粉飾，這段要真的挑毛病。
+
+用字精準，每個結論都要對應回上面的數據。`;
+    const txt = await callGemini([{ text: prompt }]);
+    window.__lastSurvivalAi = txt;
+    out.innerHTML = `<div class="nwOut">${mdToCardHtml(txt, 'var(--teal)')}</div>`;
+  }catch(e){
+    out.innerHTML = `<p class="empty" style="color:var(--coral);">✗ ${esc(e.message)}</p>`;
+  }finally{ btn.disabled = false; }
 });
 
 function gapToHypo(key, dim){

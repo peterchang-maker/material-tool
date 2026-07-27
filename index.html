@@ -1973,6 +1973,38 @@ function getCustomDims(){ return lsGet(LS.customDims, []); }
 // 市場專屬維度：只標市場素材，用來發掘我方完全沒做過的視覺手法
 function getMarketDims(){ return lsGet(LS.marketDims, []); }
 // 市場素材的完整維度＝共用 18 維 ＋ 我方自訂維度 ＋ 市場專屬維度
+// AI 回傳的鍵名不固定（維度 / dimensions / suggestions，甚至直接給陣列），
+// 全部接受，避免因為鍵名不同就判定「沒有提出建議」。
+function pickDimList(parsed){
+  const norm = arr => (Array.isArray(arr) ? arr : [])
+    .map(d=>{
+      if(typeof d === 'string') return { name: d, hint: '' };
+      if(d && typeof d === 'object'){
+        const name = d.name || d.維度 || d.維度名稱 || d.dimension || d.title || '';
+        const hint = d.hint || d.選項 || d.options || d.values || '';
+        const why  = d.why || d.reason || d.說明 || d.理由 || '';
+        return { name: String(name).trim(), hint: String(hint).trim(), why: String(why).trim() };
+      }
+      return null;
+    })
+    .filter(d=>d && d.name);
+  if(!parsed) return [];
+  if(Array.isArray(parsed)) return norm(parsed);
+  if(typeof parsed === 'object'){
+    for(const k of ['維度','dimensions','suggestions','建議','新維度','items','result','data']){
+      if(Array.isArray(parsed[k])) return norm(parsed[k]);
+    }
+    // 找不到已知鍵名 → 取第一個「陣列且元素含 name」的值
+    for(const v of Object.values(parsed)){
+      if(Array.isArray(v)){
+        const got = norm(v);
+        if(got.length) return got;
+      }
+    }
+  }
+  return [];
+}
+
 function marketAllDims(){ return allCrossDims().concat(getMarketDims().map(d=>d.name)); }
 function getTagSchema(isMarket){
   let fields = TAG_FIELDS.concat(getCustomDims().map(d=>[d.name, d.hint || '請依素材內容判斷']));
@@ -2869,7 +2901,9 @@ ${lines}
 document.getElementById('mkAutoTagBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('mkAutoTagBtn');
   const retag = document.getElementById('mkRetagAll').checked;
-  const dims = allCrossDims();
+  // 市場素材要用完整維度判斷「是否缺標」——只用共用維度會漏掉市場專屬維度，
+  // 導致新增市場維度後，工具誤判「已齊全」而跳過，資料永遠補不上。
+  const dims = marketAllDims();
   const pending = marketAll().filter(i=>{
     if(!imgPart(i.dataUrl)) return false;
     if(!i.tags) return true;
@@ -2933,7 +2967,7 @@ ${samples.length ? '以下附上幾張我們實際投放的素材圖片作為參
     samples.forEach(img=>{ const p = imgPart(img.dataUrl); if(p) parts.push(p); });
     const txt = await callGemini(parts);
     const p = parseJsonSafe(txt);
-    const dims = (p && Array.isArray(p.維度) ? p.維度 : []).filter(d=>d && d.name);
+    const dims = pickDimList(p);
     if(!dims.length){ wrap.innerHTML = '<span class="progressText">AI 沒有提出有效建議，請再試一次</span>'; return; }
     window.__sugDims = dims;
     wrap.innerHTML = dims.map((d, i)=>{
@@ -3128,7 +3162,7 @@ ${existing}
     samples.forEach(img=>{ const p = imgPart(img.dataUrl); if(p) parts.push(p); });
     const txt = await callGemini(parts);
     const p = parseJsonSafe(txt);
-    const dims = (p && Array.isArray(p.維度) ? p.維度 : []).filter(d=>d && d.name);
+    const dims = pickDimList(p);
     if(!dims.length){ wrap.innerHTML = '<span class="progressText">AI 沒有提出有效建議，請再試一次</span>'; return; }
     window.__sugMktDims = dims;
     wrap.innerHTML = dims.map((d, i)=>{
@@ -4191,7 +4225,8 @@ function renderMarketCompare(){
   const totI = ownPerf.reduce((s,i)=>s+(i.matchedRow.曝光||0),0);
   const overall = totI ? totC/totI : 0;
 
-  // 每個特徵值：我方實際加權 CTR
+  // 每個特徵值：我方實際成效（CTR 用於象限判定，其餘指標一併帶出供交叉檢視）
+  const _sum = (list, f) => list.reduce((s,i)=>s + (Number(f(i.matchedRow)) || 0), 0);
   function ownCtr(dim, key){
     const hit = ownPerf.filter(i=>{
       let v = aiResults[i.name][dim];
@@ -4199,9 +4234,15 @@ function renderMarketCompare(){
       return String(v).replace(/\s*[（(]不確定[)）]\s*/g,'').trim() === key;
     });
     if(!hit.length) return null;
-    const c = hit.reduce((s,i)=>s+(i.matchedRow.點擊||0),0);
-    const im = hit.reduce((s,i)=>s+(i.matchedRow.曝光||0),0);
-    return im ? { ctr: c/im, n: hit.length, impr: im, low: im < thr } : null;
+    const c = _sum(hit, r=>r.點擊), im = _sum(hit, r=>r.曝光);
+    if(!im) return null;
+    const cost = _sum(hit, r=>r.費用);
+    const conv = _sum(hit, r=>(r.預約次數 != null ? r.預約次數 : r.安裝次數));
+    return {
+      ctr: c/im, n: hit.length, impr: im, low: im < thr,
+      cpc: c ? cost/c : null, cpm: cost/im*1000,
+      cvr: c ? conv/c : null, cpa: conv ? cost/conv : null, cost
+    };
   }
 
   // 四象限判定
@@ -4239,7 +4280,9 @@ function renderMarketCompare(){
       }else if(mktHigh && ownLow && !oc){
         q = 'untest';
       }
-      if(q) findings.push({dim, key:k, own:op, mkt:mp, ctr: oc?oc.ctr:null, lift, q, n: oc?oc.n:0});
+      if(q) findings.push({dim, key:k, own:op, mkt:mp, ctr: oc?oc.ctr:null, lift, q, n: oc?oc.n:0,
+                           cpc: oc?oc.cpc:null, cpm: oc?oc.cpm:null, cvr: oc?oc.cvr:null,
+                           cpa: oc?oc.cpa:null, cost: oc?oc.cost:null});
       const badge = q ? `<span class="qBadge" style="color:${QUAD[q].color}; background:${QUAD[q].bg}; border-color:${QUAD[q].color};">${QUAD[q].label}</span>` : '';
       return `
         <div class="mvRow2">
@@ -4264,7 +4307,7 @@ function renderMarketCompare(){
   const grouped = order.map(q=>({ q, items: findings.filter(f=>f.q===q) })).filter(g=>g.items.length);
   gapsEl.innerHTML = grouped.length ? `
     <h3 style="font-size:14px; margin:16px 0 4px;">決策矩陣：市場在做什麼 × 我們在做什麼 × 我們做了有沒有效</h3>
-    <p class="sub" style="margin:0 0 10px;">占比差異 ≥15 個百分點且我方 CTR 高／低於整體 10% 以上才會列入；樣本不足者不判定。</p>
+    <p class="sub" style="margin:0 0 10px;">占比差異 ≥15 個百分點且我方 CTR 高／低於整體 10% 以上才會列入；樣本不足者不判定。象限由 CTR 判定，但每列都附 CVR／CPA——若判為「加碼」而 CPA 明顯偏高，代表吸睛卻不轉換，請以 CPA 為準再確認。</p>
     ${grouped.map(g=>{
       const Q = QUAD[g.q];
       return `<div class="quadBlock" style="border-left:4px solid ${Q.color};">
@@ -4272,7 +4315,7 @@ function renderMarketCompare(){
         ${g.items.sort((a,b)=>Math.abs(b.lift||0)-Math.abs(a.lift||0)).map((f,i)=>`
           <div class="quadItem">
             <b>${esc(f.dim)}＝${esc(f.key)}</b>
-            <span class="quadMeta">市場 ${f.mkt.toFixed(0)}% · 我方 ${f.own.toFixed(0)}%${f.ctr!=null ? ` · 我方 CTR ${(f.ctr*100).toFixed(2)}%（${f.lift>=0?'+':''}${f.lift.toFixed(0)}%，${f.n} 支）` : ' · 我方尚無此類素材'}</span>
+            <span class="quadMeta">市場 ${f.mkt.toFixed(0)}% · 我方 ${f.own.toFixed(0)}%${f.ctr!=null ? ` · CTR ${(f.ctr*100).toFixed(2)}%（${f.lift>=0?'+':''}${f.lift.toFixed(0)}%）${f.cvr!=null?` · CVR ${(f.cvr*100).toFixed(2)}%`:''}${(f.cpa!=null&&isFinite(f.cpa))?` · CPA $${Math.round(f.cpa)}`:''} · ${f.n} 支` : ' · 我方尚無此類素材'}</span>
           </div>`).join('')}
       </div>`;
     }).join('')}` : '<p class="sub" style="margin-top:12px;">尚無足夠證據形成決策建議（需要占比差異明顯、且我方有對應素材的成效資料）。</p>';
@@ -4322,20 +4365,51 @@ function buildNextWaveContext(){
   const dims = allCrossDims();
   const mDims = getMarketDims().map(d=>d.name);
 
-  // ① 我方：每支素材的關鍵標籤 × 實際成效
+  // ── 多指標彙總：把一組素材加總成完整的成效輪廓 ──
+  // 只看 CTR 會誤導：吸睛但不轉換的素材 CTR 高、CPA 也高。
+  // 因此漏斗每一層都算：曝光 → 點擊(CTR/CPC/CPM) → 轉換(CVR/CPA)。
+  function agg(list){
+    const sum = f => list.reduce((s,i)=>s + (Number(f(i.matchedRow)) || 0), 0);
+    const impr = sum(r=>r.曝光), click = sum(r=>r.點擊);
+    const cost = sum(r=>r.費用);
+    const conv = sum(r=>(r.預約次數 != null ? r.預約次數 : r.安裝次數));
+    return {
+      n: list.length, impr, click, cost, conv,
+      ctr: impr ? click / impr : null,
+      cpc: click ? cost / click : null,
+      cpm: impr ? cost / impr * 1000 : null,
+      cvr: click ? conv / click : null,
+      cpa: conv ? cost / conv : null
+    };
+  }
+  const pct2 = v => v == null ? '-' : (v * 100).toFixed(2) + '%';
+  const money = v => (v == null || !isFinite(v)) ? '-' : '$' + (v >= 100 ? Math.round(v).toLocaleString() : v.toFixed(1));
+  const lift = (v, base, lowerBetter) => {
+    if(v == null || base == null || !base || !isFinite(v)) return '';
+    const d = (v - base) / base * 100;
+    // 差距在 ±1% 內視為持平，避免「+0%，劣於整體」這種矛盾的描述
+    if(Math.abs(d) < 1) return '（與整體相當）';
+    // CPA / CPC / CPM 是越低越好，標示成「優於／劣於」而不是單純的正負
+    const good = lowerBetter ? d < 0 : d > 0;
+    return `（${d >= 0 ? '+' : ''}${d.toFixed(0)}%，${good ? '優於' : '劣於'}整體）`;
+  };
+
+  const OV = agg(ownPerf);   // 整體基準
+  const overall = OV.ctr || 0;
+  const thr = getImprThreshold();
+
+  // ① 我方：每支素材的關鍵標籤 × 完整指標
   const ownLines = ownPerf.map(i=>{
     const t = aiResults[i.name], r = i.matchedRow;
     const tagStr = dims.map(d=>t[d] ? `${d}=${t[d]}` : null).filter(Boolean).join('｜');
-    const ctr = r.CTR!=null ? (r.CTR*100).toFixed(2)+'%' : '-';
-    const cpa = (r.CPA!=null && isFinite(r.CPA)) ? Math.round(r.CPA) : '-';
-    return `- ${i.name}｜CTR ${ctr}｜CPA ${cpa}｜曝光 ${r.曝光||0}｜${tagStr}`;
+    const one = agg([i]);
+    const m = [`CTR ${pct2(one.ctr)}`, `CPC ${money(one.cpc)}`, `CPM ${money(one.cpm)}`,
+               `CVR ${pct2(one.cvr)}`, `CPA ${money(one.cpa)}`,
+               `曝光 ${one.impr.toLocaleString()}`, `花費 ${money(one.cost)}`].join('｜');
+    return `- ${i.name}｜${m}｜${tagStr}`;
   }).join('\n');
 
-  // 我方特徵層級的成效彙總（加權 CTR，比逐支素材更有統計意義）
-  const totC = ownPerf.reduce((s,i)=>s+(i.matchedRow.點擊||0),0);
-  const totI = ownPerf.reduce((s,i)=>s+(i.matchedRow.曝光||0),0);
-  const overall = totI ? totC/totI : 0;
-  const thr = getImprThreshold();
+  // 我方特徵層級的成效彙總（比逐支素材更有統計意義；七項指標一次給）
   const ownFeat = [];
   dims.forEach(dim=>{
     const groups = {};
@@ -4347,12 +4421,18 @@ function buildNextWaveContext(){
     });
     Object.keys(groups).forEach(k=>{
       const g = groups[k];
-      const c = g.reduce((s,i)=>s+(i.matchedRow.點擊||0),0);
-      const im = g.reduce((s,i)=>s+(i.matchedRow.曝光||0),0);
-      if(!im) return;
-      const ctr = c/im;
-      const lift = overall>0 ? (ctr-overall)/overall*100 : 0;
-      ownFeat.push(`- ${dim}=${k}｜${g.length} 支｜加權CTR ${(ctr*100).toFixed(2)}%（相對整體 ${lift>=0?'+':''}${lift.toFixed(0)}%）${im<thr?'｜樣本不足':''}`);
+      const a = agg(g);
+      if(!a.impr) return;
+      const parts = [
+        `CTR ${pct2(a.ctr)}${lift(a.ctr, OV.ctr, false)}`,
+        `CPC ${money(a.cpc)}${lift(a.cpc, OV.cpc, true)}`,
+        `CPM ${money(a.cpm)}${lift(a.cpm, OV.cpm, true)}`,
+        `CVR ${pct2(a.cvr)}${lift(a.cvr, OV.cvr, false)}`,
+        `CPA ${money(a.cpa)}${lift(a.cpa, OV.cpa, true)}`,
+        `花費 ${money(a.cost)}`
+      ];
+      ownFeat.push(`- ${dim}=${k}｜${a.n} 支｜曝光 ${a.impr.toLocaleString()}｜` +
+                   parts.join('｜') + (a.impr < thr ? '｜⚠樣本不足' : ''));
     });
   });
 
@@ -4376,11 +4456,25 @@ function buildNextWaveContext(){
 
   // 決策矩陣結論
   const QLABEL = { chase:'錯失的機會(市場高我方低且我方CTR佳)', trap:'市場的陷阱(市場高但我方CTR差)', moat:'我們的優勢(我方高且CTR佳)', cut:'該砍的慣性(我方高但CTR差)', untest:'尚未驗證(市場高我方無)' };
+  // 註：象限是用 CTR 判定的，但每列都附上 CPC / CVR / CPA。
+  // 若某項象限說「加碼」而 CPA 很差，請在建議裡指出這個矛盾。
   const findLines = (cross && cross.findings ? cross.findings : []).map(f=>
-    `- [${QLABEL[f.q]||f.q}] ${f.dim}=${f.key}｜市場 ${f.mkt.toFixed(0)}%／我方 ${f.own.toFixed(0)}%${f.ctr!=null?`｜我方CTR ${(f.ctr*100).toFixed(2)}%（${f.lift>=0?'+':''}${f.lift.toFixed(0)}%）`:'｜我方尚無此類素材'}`
+    `- [${QLABEL[f.q]||f.q}] ${f.dim}=${f.key}｜市場 ${f.mkt.toFixed(0)}%／我方 ${f.own.toFixed(0)}%` +
+    (f.ctr!=null
+      ? `｜CTR ${(f.ctr*100).toFixed(2)}%（${f.lift>=0?'+':''}${f.lift.toFixed(0)}%）`
+        + `｜CPC ${f.cpc!=null&&isFinite(f.cpc)?'$'+f.cpc.toFixed(1):'-'}`
+        + `｜CVR ${f.cvr!=null?(f.cvr*100).toFixed(2)+'%':'-'}`
+        + `｜CPA ${f.cpa!=null&&isFinite(f.cpa)?'$'+Math.round(f.cpa):'-'}`
+        + `｜${f.n} 支`
+      : '｜我方尚無此類素材')
   ).join('\n');
 
-  return { ownLines, ownFeat: ownFeat.join('\n'), mktLines, moLines, findLines, overall, ownN: ownPerf.length, mktN: mktTagged.length, mDims };
+  const ownBase = `- 素材數 ${OV.n} 支｜總曝光 ${OV.impr.toLocaleString()}｜總點擊 ${OV.click.toLocaleString()}｜`
+    + `總花費 ${money(OV.cost)}｜總轉換 ${OV.conv.toLocaleString()}\n`
+    + `- 加權 CTR ${pct2(OV.ctr)}｜CPC ${money(OV.cpc)}｜CPM ${money(OV.cpm)}｜CVR ${pct2(OV.cvr)}｜CPA ${money(OV.cpa)}`;
+
+  return { ownLines, ownFeat: ownFeat.join('\n'), ownBase, mktLines, moLines, findLines,
+           overall, ownN: ownPerf.length, mktN: mktTagged.length, mDims };
 }
 
 document.getElementById('nextWaveBtn').addEventListener('click', async ()=>{
@@ -4397,18 +4491,21 @@ document.getElementById('nextWaveBtn').addEventListener('click', async ()=>{
     setProg('nwProgBar','nwProgText','nwProgress', 2, 3, 'AI 分析中…');
     const prompt = `你是資深遊戲行銷素材策略顧問，服務對象是手遊《天堂M》的行銷團隊。請根據以下三份資料，產出「下一波素材該怎麼做」的具體建議。
 
-═══ 資料一：我方素材的實際成效（${ctx.ownN} 支，整體加權 CTR ${(ctx.overall*100).toFixed(2)}%）═══
+═══ 資料一：我方素材的實際成效（${ctx.ownN} 支）═══
+
+【整體基準線】（判斷「好不好」都要跟這條線比）
+${ctx.ownBase}
 
 【逐支素材】
 ${ctx.ownLines}
 
-【特徵層級的成效彙總】（這是最重要的證據：哪些特徵真的帶來高 CTR）
+【特徵層級的成效彙總】（這是最重要的證據：哪些特徵真的帶來好成效）
 ${ctx.ownFeat || '（資料不足）'}
 
 ═══ 資料二：市場競品的特徵分佈（${ctx.mktN} 支，以存活天數加權；存活越久代表越可能在跑量）═══
 ${ctx.mktLines || '（資料不足）'}
 
-【工具已判定的決策矩陣結論】
+【工具已判定的決策矩陣結論】（象限是用 CTR 判定的，但每列都附了 CPC／CVR／CPA——若象限說「加碼」而 CPA 明顯偏差，請在建議中指出這個矛盾）
 ${ctx.findLines || '（尚無足夠證據形成判定）'}
 
 ═══ 資料三：市場專屬手法（競品在用、我方完全沒做過，因此沒有我方成效可比）═══
@@ -4428,6 +4525,15 @@ ${extra ? `═══ 補充脈絡 ═══\n${extra}\n` : ''}
 
 ### 四、風險提醒
 指出上述建議中樣本數不足、或可能是相關而非因果的部分，避免過度解讀。
+
+分析原則（很重要）：
+・【不要只看 CTR】CTR 只代表「吸不吸睛」，不代表「有沒有效」。請把漏斗每一層都納入判斷：
+　　曝光 → CTR / CPC / CPM（獲取點擊的效率）→ CVR（點擊後的說服力）→ CPA（最終取得成本）
+・特別注意「CTR 高但 CPA 也高」的素材：那是吸引到錯的人，不該加碼；
+　反過來「CTR 普通但 CVR 與 CPA 好」的素材，往往才是真正該擴大的。
+・CPA / CPC / CPM 是越低越好，CTR / CVR 是越高越好，不要弄反。
+・每個結論都要指出你依據的是哪個指標；若不同指標互相矛盾，請明講矛盾在哪，不要只挑對自己論點有利的那個。
+・花費佔比也要納入考量：花很多錢但成效普通的特徵，優先級高於花很少錢的極端值。
 
 輸出格式要求（很重要，會直接呈現給行銷團隊閱讀）：
 ・【最重要】直接輸出純文字，不要包成 JSON、不要用 {} 包起來、不要加程式碼區塊（三個反引號）、不要加任何前言或結語

@@ -57,6 +57,25 @@
   section.collapsed .collCaret{transform:rotate(-90deg);}
   section.collapsed > h2{margin-bottom:0;}
   section.collapsed .collBody{display:none;}
+  /* 各維度占比分析 */
+  .dsBox{margin-top:16px; padding:14px 16px; border:1px solid var(--border); border-radius:8px;}
+  .dsMeta{display:flex; flex-wrap:wrap; gap:12px; font-size:11.5px; color:var(--text-secondary); margin-bottom:10px;}
+  .dsMeta span{border:1px solid var(--border); border-radius:20px; padding:2px 10px;}
+  .dsGrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(275px,1fr)); gap:11px;}
+  .dsCard{border:1px solid var(--border); border-radius:7px; padding:11px 13px; background:var(--card,#fff);}
+  .dsDim{font-size:12.5px; font-weight:600; margin:0 0 8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+  .dsTag{font-size:10px; font-weight:400; border-radius:20px; padding:1px 7px; border:1px solid var(--border); color:var(--text-muted);}
+  .dsTag.mk{border-color:var(--teal); color:var(--teal);}
+  .dsTag.warn{border-color:var(--coral); color:var(--coral);}
+  .dsRow{display:flex; align-items:center; gap:7px; font-size:11.5px; margin-bottom:4px;}
+  .dsKey{width:96px; flex:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .dsBarWrap{flex:1; height:7px; background:var(--border); border-radius:4px; overflow:hidden;}
+  .dsBar{display:block; height:100%; background:#5b7bb5;}
+  .dsPct{width:32px; flex:none; text-align:right; color:var(--text-secondary);}
+  .dsGap{font-size:10px; flex:none; width:26px;}
+  .dsGap.up{color:var(--teal);} .dsGap.down{color:var(--coral);}
+  .dsMore{margin:5px 0 0; font-size:10.5px; color:var(--text-muted);}
+  .dsNote{margin:12px 0 0; font-size:11.5px; color:var(--text-muted); line-height:1.7;}
   /* 競品自驗證 */
   .svBox{margin-top:16px; padding:14px 16px; border:1px solid var(--teal); border-radius:8px; background:var(--teal-bg);}
   .svMeta{display:flex; flex-wrap:wrap; gap:14px; font-size:11.5px; color:var(--text-secondary); margin-bottom:8px;}
@@ -86,7 +105,25 @@
   .mdTitle{font-size:13.5px; font-weight:600; margin:0 0 4px;}
   .mdSub{font-size:11.5px; font-weight:400; color:var(--text-muted);}
   .nwBox{margin-top:18px; padding:16px; border:1px solid var(--teal); border-radius:8px; background:var(--teal-bg);}
-  .nwOut{margin-top:12px; padding:14px 16px; background:var(--card,#fff); border:1px solid var(--border); border-radius:7px; font-size:13px; line-height:1.85; white-space:pre-wrap;}
+  /* 建議輸出：結構化排版 */
+  .nwOut{margin-top:12px;}
+  .nwSec{background:var(--card,#fff); border:1px solid var(--border); border-radius:8px; padding:0 0 14px; margin-bottom:12px; overflow:hidden;}
+  .nwSecHead{display:flex; align-items:center; gap:9px; padding:11px 16px; background:var(--teal-bg); border-bottom:1px solid var(--border);}
+  .nwSecNo{flex:none; width:22px; height:22px; border-radius:50%; background:var(--teal); color:#fff; font-size:11.5px; font-weight:700; display:flex; align-items:center; justify-content:center;}
+  .nwSecTitle{font-size:14px; font-weight:700; color:var(--teal);}
+  .nwSec.risk .nwSecHead{background:rgba(201,107,107,.09);}
+  .nwSec.risk .nwSecNo{background:var(--coral);}
+  .nwSec.risk .nwSecTitle{color:var(--coral);}
+  .nwBody{padding:12px 16px 0; font-size:13px; line-height:1.75;}
+  .nwP{margin:0 0 9px;}
+  .nwLi{display:flex; gap:9px; margin:0 0 8px; align-items:flex-start;}
+  .nwLi > .b{flex:none; width:5px; height:5px; border-radius:50%; background:var(--teal); margin-top:8px;}
+  .nwSec.risk .nwLi > .b{background:var(--coral);}
+  .nwLi > .t{flex:1;}
+  .nwSub{font-size:12.5px; font-weight:700; margin:13px 0 7px; padding-left:9px; border-left:3px solid var(--teal);}
+  .nwSec.risk .nwSub{border-left-color:var(--coral);}
+  .nwOut b{color:var(--teal);}
+  .nwSec.risk .nwOut b, .nwSec.risk b{color:var(--coral);}
   .moBox{margin-top:18px;}
   .moGrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin-top:10px;}
   .moCard{border:1px solid var(--border); border-radius:7px; padding:12px 14px; background:rgba(91,123,181,.05);}
@@ -157,12 +194,6 @@
   .toolbar input[type=number]{width:90px;}
   .ghostBtn{height:32px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface); padding:0 12px; font-size:12.5px; cursor:pointer; color:var(--text); font-family:inherit;}
   .ghostBtn:hover{background:#faf9f6;}
-  .hypoCard{border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:10px; font-size:13px;}
-  .hypoCard .verdict{font-weight:600;}
-  .hypoCard .verdict.pass{color:var(--teal);}
-  .hypoCard .verdict.fail{color:var(--coral);}
-  .hypoCard .verdict.na{color:var(--text-muted);}
-  .hypoHist{font-size:11.5px; color:var(--text-muted); margin-top:6px;}
   .histItem{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); font-size:12.5px;}
   .histItem .meta{color:var(--text-muted); font-size:11.5px;}
   .histItem button{height:26px; font-size:11.5px; padding:0 10px;}
@@ -191,15 +222,6 @@
   .dSep{color:var(--text-muted); font-size:13px;}
   .dUnit{font-size:12px; color:var(--text-muted);}
   .dHint{font-size:11.5px; color:var(--text-muted);}
-  .dpStat{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:14px 0 4px;}
-  .dpCard{background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:11px 13px;}
-  .dpCard .k{font-size:11.5px; color:var(--text-muted); margin-bottom:3px;}
-  .dpCard .v{font-size:19px; font-weight:700; color:var(--text);}
-  .dpCard .s{font-size:11px; margin-top:2px;}
-  .dpCard.good{background:#e9f4f1; border-color:#0f6e56;}
-  .dpCard.good .v{color:#0f6e56;}
-  .dpCard.warn{background:#fbeae5; border-color:#b3452f;}
-  .dpCard.warn .v{color:#b3452f;}
   .kpiGrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;}
   .kpiCard{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px;}
   .kpiCard .k{font-size:12px; color:var(--text-muted); margin-bottom:4px;}
@@ -289,7 +311,7 @@
 <body>
 <div class="wrap">
   <h1>天堂M 素材成效分析工具 <span style="font-size:12px; color:var(--text-muted); font-weight:400;">v2</span></h1>
-  <p class="sub">上傳「素材分析」格式的 Excel，自動拆解素材特徵並產出成效洞察。v2 新增：命名驗證、樣本量警示、走期疲勞分析、單次 AI 往返、假設追蹤、歷史庫備份、週報圖卡匯出。</p>
+  <p class="sub">上傳「素材分析」格式的 Excel，自動拆解素材特徵並產出成效洞察。v2.4：AI 視覺標籤、競品素材交叉分析、長短存活自驗證、下一波素材建議、歷史庫備份。</p>
 
   <div class="uploadBox" id="uploadBox">
     <p class="main">點擊或拖曳 Excel 檔案到這裡（.xlsx）</p>
@@ -432,12 +454,6 @@
       </div>
     </section>
 
-    <section>
-      <h2>走期疲勞分析</h2>
-      <p class="sub" style="margin:0 0 12px;">同一素材在不同走期的 CTR 變化，用來判斷素材是否已疲勞、該不該換。需要素材命名包含第 5 段「走期」欄位。</p>
-      <div id="cycleWrap"><canvas id="cycleChart" style="max-height:300px;"></canvas></div>
-      <div id="cycleHint"></div>
-    </section>
 
     <section>
       <h2>AI 視覺特徵分析（透過 Gemini）</h2>
@@ -534,16 +550,6 @@
       <div id="aiSummaryWrap" style="margin-top:16px;"></div>
     </section>
 
-    <section>
-      <h2>假設追蹤（洞察驗證閉環）</h2>
-      <p class="sub" style="margin:0 0 12px;">把行動建議變成可驗證的假設。輸入關鍵字後，工具會在每次上傳新資料時，自動比對「含關鍵字素材 vs 其他素材」的加權 CTR，驗證建議是否兌現。</p>
-      <div class="controls" style="margin-bottom:14px;">
-        <input id="hypoDesc" placeholder="假設描述，例：加倒數標示可提升 CTR" style="flex:1; min-width:220px;">
-        <input id="hypoKeyword" placeholder="比對關鍵字，例：倒數" style="width:160px;">
-        <button class="primaryBtn" id="addHypoBtn" style="height:32px; font-size:12.5px;">新增假設</button>
-      </div>
-      <div id="hypoList"></div>
-    </section>
 
     <section>
       <h2>市場素材庫（競品對比）</h2>
@@ -574,6 +580,21 @@
         </label>
         <button class="ghostBtn" id="mkGenPromptBtn" style="height:34px; font-size:13px;">手動：產生市場素材 Prompt</button>
         <button class="ghostBtn" id="mkClearTaggedBtn" style="display:none;"></button>
+      </div>
+
+      <!-- 各維度占比分析：市場素材的完整特徵輪廓 -->
+      <div class="dsBox">
+        <p class="mdTitle">各維度占比分析 <span class="mdSub">競品素材的完整特徵輪廓，一次看完所有維度</span></p>
+        <p class="sub" style="margin:0 0 10px; font-size:12px;">列出目前分析範圍內，每個維度各個選項的占比。可切換加權方式：以存活天數加權（跑越久權重越高，更接近「競品實際在推什麼」）或單純計數（每支素材等重，看的是「競品做過什麼」）。</p>
+        <div class="controls" style="margin-bottom:10px;">
+          <span style="font-size:12px; color:var(--text-secondary);">加權方式</span>
+          <button class="ghostBtn dsWBtn" data-w="sv">存活天數加權</button>
+          <button class="ghostBtn dsWBtn" data-w="cnt">單純計數</button>
+          <span style="font-size:12px; color:var(--text-secondary); margin-left:8px;">排序</span>
+          <button class="ghostBtn dsSBtn" data-s="conc">集中度高的優先</button>
+          <button class="ghostBtn dsSBtn" data-s="dim">依維度順序</button>
+        </div>
+        <div id="dsOutput"></div>
       </div>
 
       <!-- 競品自驗證：用存活天數當成效代理 -->
@@ -719,83 +740,6 @@
       </div>
     </section>
 
-    <section id="dailySection">
-      <h2>每日戰報產生器</h2>
-      <p class="sub" style="margin:0 0 14px;">填入今日數據，工具自動計算進度與差異，並可用 AI 草擬歸因與行動方案。產出可直接複製貼上或匯出圖卡。</p>
-
-      <div class="dailyGrid">
-        <div class="dailyBox">
-          <p class="dailyBoxT">① 走期與預算</p>
-          <div class="dailyRow">
-            <label>走期進度</label>
-            <input id="dpDay" type="number" min="0" placeholder="第幾天" style="width:80px;">
-            <span class="dSep">/</span>
-            <input id="dpTotalDay" type="number" min="1" placeholder="總天數" style="width:80px;">
-            <span class="dUnit">天</span>
-          </div>
-          <div class="dailyRow">
-            <label>累積花費</label>
-            <input id="dpSpent" type="number" min="0" placeholder="已花金額" style="width:120px;">
-            <span class="dSep">/</span>
-            <input id="dpBudget" type="number" min="0" placeholder="總預算" style="width:120px;">
-          </div>
-          <div class="dailyRow">
-            <label>非媒體費用</label>
-            <input id="dpNonMedia" type="number" min="0" placeholder="製作費等（選填）" style="width:150px;">
-            <span class="dHint" id="dpNonMediaHint"></span>
-          </div>
-          <div class="dailyRow">
-            <label>目標 CPA</label>
-            <input id="dpTargetCpa" type="number" min="0" placeholder="450" style="width:100px;">
-          </div>
-        </div>
-
-        <div class="dailyBox">
-          <p class="dailyBoxT">② 今日數據</p>
-          <div class="dailyRow">
-            <label>今日花費</label>
-            <input id="dpTodayCost" type="number" min="0" placeholder="今日金額" style="width:120px;">
-          </div>
-          <div class="dailyRow">
-            <label>今日導入量</label>
-            <input id="dpTodayConv" type="number" min="0" placeholder="新增人數" style="width:120px;">
-          </div>
-          <div class="dailyRow">
-            <label>昨日 CPA</label>
-            <input id="dpYestCpa" type="number" min="0" placeholder="用於算變化%" style="width:120px;">
-          </div>
-          <div class="dailyRow">
-            <label>變化主因</label>
-            <input id="dpReason" placeholder="例：調整渠道受眾 / 新素材上線" style="flex:1; min-width:180px;">
-          </div>
-        </div>
-
-        <div class="dailyBox">
-          <p class="dailyBoxT">③ 社群輿情</p>
-          <div class="dailyRow" style="align-items:flex-start;">
-            <label style="padding-top:8px;">焦點議題</label>
-            <textarea id="dpBuzz" rows="3" placeholder="巴哈 / FB 玩家熱議主題摘要" style="flex:1; min-width:200px;"></textarea>
-          </div>
-          <div class="dailyRow" style="align-items:flex-start;">
-            <label style="padding-top:8px;">順勢操作</label>
-            <textarea id="dpBuzzAction" rows="3" placeholder="例：好評明日安排迷因圖／疑慮已請小編發 FAQ" style="flex:1; min-width:200px;"></textarea>
-          </div>
-        </div>
-      </div>
-
-      <div class="controls" style="margin:16px 0 8px;">
-        <button class="ghostBtn" id="dpCalcBtn">計算並產生戰報</button>
-        <button class="ghostBtn" id="dpAiBtn" style="color:var(--gold);">⚡ AI 草擬歸因與行動方案</button>
-        <button class="ghostBtn" id="dpCopyBtn" style="display:none;">複製全文</button>
-        <button class="ghostBtn" id="dpCardBtn" style="display:none;">匯出戰報圖卡（PNG）</button>
-        <span class="progressText" id="dpHint" style="margin-top:0;"></span>
-      </div>
-
-      <div id="dpAutoPanel"></div>
-      <div id="dpOutWrap" style="display:none;">
-        <textarea id="dpOut" rows="22" style="width:100%; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.65;"></textarea>
-      </div>
-    </section>
 
     <section>
       <h2>歷史庫與資料備份</h2>
@@ -866,10 +810,8 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
   document.getElementById('geminiResultInput').value='';
   document.getElementById('summaryResultInput').value='';
   document.getElementById('nameCheckPanel').innerHTML='';
-  document.getElementById('cycleHint').innerHTML='';
   document.getElementById('featureCrossWrap').innerHTML='';
   document.getElementById('compareWrap').innerHTML='';
-  if(typeof cycleChartInst!=='undefined' && cycleChartInst){ cycleChartInst.destroy(); cycleChartInst=null; }
   if(typeof crossImpactInst!=='undefined' && crossImpactInst){ crossImpactInst.destroy(); crossImpactInst=null; }
   lastAiSummary=null;
   window.__lastPerfSnapshot=null;
@@ -1828,8 +1770,6 @@ function renderAll(){
   angleSel.innerHTML = '<option value="">所有切角</option>' + uniq(RAW.map(d=>d.素材切角)).map(c=>`<option>${c}</option>`).join('');
 
   renderTable();
-  renderCycleChart(perfData);
-  renderHypotheses(perfData);
   window.__lastPerfSnapshot = { perfData, avgCTR, totalCost, angleWithScore, spAgg: sortAggBy(SP_AGG,'ctr'), ctxLabel };
 }
 
@@ -2347,10 +2287,10 @@ document.getElementById('applySummaryBtn').addEventListener('click', ()=>{
 });
 
 // ══════════════════════════════════════════════════════════
-// v2 新增功能：設定 / 命名驗證 / 走期疲勞 / 假設追蹤 / 歷史庫備份 / 週報圖卡
+// v2 新增功能：設定 / 命名驗證 / 歷史庫備份 / 週報圖卡
 // ══════════════════════════════════════════════════════════
 let lastAiSummary = null;
-const LS = { settings:'mt_settings', history:'mt_history', hypo:'mt_hypotheses' };
+const LS = { settings:'mt_settings', history:'mt_history' };
 LS.own = 'mt_own';   // 我方素材持久化：{ raw, ai, imgNames }
 LS.collapse = 'mt_collapse';        // 區塊收合狀態
 LS.marketDims = 'mt_market_dims';   // 市場專屬維度（僅標市場素材，用於發掘我方沒做過的手法）
@@ -2406,143 +2346,6 @@ function renderNameCheck(){
       <ul>${items}${bad.length>12?`<li>…另有 ${bad.length-12} 筆，請於明細表檢視</li>`:''}</ul>
     </div>`;
 }
-
-// ── 走期疲勞分析 ───────────────────────────────────────
-let cycleChartInst = null;
-function renderCycleChart(perfData){
-  const hint = document.getElementById('cycleHint');
-  const withCycle = perfData.filter(d=>d.走期 && d.賣點);
-  if(cycleChartInst){ cycleChartInst.destroy(); cycleChartInst = null; }
-  if(!withCycle.length){
-    hint.innerHTML = `<p class="empty">目前資料沒有走期欄位。素材命名加上第 5 段走期（如 W1、W2）後即可啟用此分析。</p>`;
-    return;
-  }
-  // 走期排序：數字感排序（W1 < W2 < W10）
-  const cycles = [...new Set(withCycle.map(d=>d.走期))].sort((a,b)=>{
-    const na = parseInt(String(a).replace(/\D/g,''),10), nb = parseInt(String(b).replace(/\D/g,''),10);
-    if(!isNaN(na) && !isNaN(nb) && na!==nb) return na-nb;
-    return String(a).localeCompare(String(b));
-  });
-  // 依賣點分組，取曝光量前 6 大且橫跨 ≥2 個走期的素材
-  const bySp = {};
-  withCycle.forEach(d=>{
-    bySp[d.賣點] = bySp[d.賣點] || {impr:0, cycles:{}};
-    bySp[d.賣點].impr += d.曝光||0;
-    const c = bySp[d.賣點].cycles[d.走期] = bySp[d.賣點].cycles[d.走期] || {click:0, impr:0};
-    c.click += d.點擊||0; c.impr += d.曝光||0;
-  });
-  const eligible = Object.entries(bySp)
-    .filter(([,v])=>Object.keys(v.cycles).length>=2)
-    .sort((a,b)=>b[1].impr-a[1].impr).slice(0,6);
-  if(!eligible.length){
-    hint.innerHTML = `<p class="empty">尚無素材橫跨兩個以上走期，等下一波數據進來後這裡會自動顯示疲勞趨勢。</p>`;
-    return;
-  }
-  const palette = ['#0f6e56','#854f0b','#993c1d','#3d5a80','#7a5195','#5f7161'];
-  const datasets = eligible.map(([sp,v],i)=>({
-    label: sp,
-    data: cycles.map(cy=>{
-      const c = v.cycles[cy];
-      return c && c.impr ? +(c.click/c.impr*100).toFixed(2) : null;
-    }),
-    borderColor: palette[i%palette.length], backgroundColor: palette[i%palette.length],
-    spanGaps:true, tension:.2, pointRadius:4
-  }));
-  cycleChartInst = new Chart(document.getElementById('cycleChart'), {
-    type:'line',
-    data:{ labels:cycles, datasets },
-    options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:12, font:{size:11}}}},
-      scales:{ y:{ticks:{callback:v=>v+'%'}, title:{display:true, text:'CTR'}} } }
-  });
-  // 疲勞判讀：末走期 CTR 比峰值下滑 ≥30% 的素材點名
-  const fatigued = eligible.map(([sp,v])=>{
-    const pts = cycles.map(cy=>{ const c=v.cycles[cy]; return c&&c.impr ? c.click/c.impr : null; }).filter(x=>x!=null);
-    if(pts.length<2) return null;
-    const peak = Math.max(...pts), last = pts[pts.length-1];
-    return (peak>0 && (peak-last)/peak >= 0.3) ? {sp, drop: Math.round((peak-last)/peak*100)} : null;
-  }).filter(Boolean);
-  hint.innerHTML = fatigued.length
-    ? `<div class="insight bad" style="margin-top:12px;">疲勞警示：${fatigued.map(f=>`<b>${f.sp}</b>（CTR 較峰值下滑 ${f.drop}%）`).join('、')}，建議評估替換或更新素材。</div>`
-    : `<div class="insight" style="margin-top:12px;">目前追蹤中的素材尚無明顯疲勞跡象（判定標準：末走期 CTR 較峰值下滑 30% 以上）。</div>`;
-}
-
-// ── 假設追蹤（洞察驗證閉環）────────────────────────────
-function weightedCTR(rows){
-  const click = rows.reduce((s,d)=>s+(d.點擊||0),0);
-  const impr = rows.reduce((s,d)=>s+(d.曝光||0),0);
-  return impr ? click/impr : null;
-}
-function evalHypothesis(h, perfData){
-  const kw = h.keyword;
-  const withKw = perfData.filter(d=>(d.素材名稱||'').includes(kw) || (d.賣點||'').includes(kw));
-  const without = perfData.filter(d=>!withKw.includes(d));
-  const thr = getImprThreshold();
-  const imprWith = withKw.reduce((s,d)=>s+(d.曝光||0),0);
-  const ctrW = weightedCTR(withKw), ctrO = weightedCTR(without);
-  if(!withKw.length) return {status:'na', text:'本次資料無含關鍵字素材，無法驗證'};
-  if(ctrO==null) return {status:'na', text:'所有素材都含此關鍵字，缺少對照組，無法驗證'};
-  if(ctrW==null) return {status:'na', text:'含關鍵字素材無有效曝光數據'};
-  if(imprWith < thr) return {status:'na', text:`含關鍵字素材曝光僅 ${imprWith.toLocaleString()}（低於門檻），樣本不足`, ctrW, ctrO};
-  const lift = ctrO>0 ? (ctrW-ctrO)/ctrO*100 : 0;
-  return {
-    status: lift>=10 ? 'pass' : (lift<=-10 ? 'fail' : 'flat'),
-    lift, ctrW, ctrO, n: withKw.length,
-    text: `含「${kw}」${withKw.length} 支素材加權 CTR ${(ctrW*100).toFixed(2)}%，其他素材 ${(ctrO*100).toFixed(2)}%，差異 ${lift>=0?'+':''}${lift.toFixed(1)}%`
-  };
-}
-function renderHypotheses(perfData){
-  const list = document.getElementById('hypoList');
-  const hypos = lsGet(LS.hypo, []);
-  if(!hypos.length){ list.innerHTML = `<p class="empty">尚未建立假設。例：描述「加倒數標示可提升 CTR」＋關鍵字「倒數」。</p>`; return; }
-  list.innerHTML = hypos.map((h,i)=>{
-    const r = perfData ? evalHypothesis(h, perfData) : {status:'na', text:'上傳資料後自動驗證'};
-    const vClass = r.status==='pass' ? 'pass' : r.status==='fail' ? 'fail' : 'na';
-    const vLabel = {pass:'✓ 假設成立', fail:'✗ 假設未成立', flat:'— 無明顯差異', na:'…待驗證'}[r.status] || '…';
-    const hist = (h.history||[]).slice(-4).map(x=>`${x.date}：${x.lift>=0?'+':''}${x.lift.toFixed(1)}%`).join('　');
-    return `
-      <div class="hypoCard">
-        <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
-          <div style="flex:1;">
-            <b>${esc(h.desc)}</b> <span class="featTag">關鍵字：${esc(h.keyword)}</span>
-            <div style="margin-top:4px;"><span class="verdict ${vClass}">${vLabel}</span>　<span style="color:var(--text-secondary); font-size:12.5px;">${esc(r.text)}</span></div>
-            ${hist ? `<div class="hypoHist">歷次驗證：${hist}</div>` : ''}
-          </div>
-          <div style="display:flex; gap:6px; flex-shrink:0;">
-            ${r.lift!=null ? `<button class="ghostBtn" style="height:28px; font-size:11.5px;" onclick="recordHypo(${i})">記錄本次</button>` : ''}
-            <button class="ghostBtn" style="height:28px; font-size:11.5px;" onclick="removeHypo(${i})">刪除</button>
-          </div>
-        </div>
-      </div>`;
-  }).join('');
-}
-window.recordHypo = function(i){
-  const hypos = lsGet(LS.hypo, []);
-  const snap = window.__lastPerfSnapshot;
-  if(!hypos[i] || !snap) return;
-  const r = evalHypothesis(hypos[i], snap.perfData);
-  if(r.lift==null){ alert('本次資料樣本不足，未記錄'); return; }
-  hypos[i].history = hypos[i].history || [];
-  hypos[i].history.push({ date: new Date().toISOString().slice(0,10), lift: r.lift, ctrW: r.ctrW, ctrO: r.ctrO, file: fileName.textContent });
-  lsSet(LS.hypo, hypos);
-  renderHypotheses(snap.perfData);
-};
-window.removeHypo = function(i){
-  const hypos = lsGet(LS.hypo, []);
-  if(!confirm(`刪除假設「${hypos[i]?.desc}」？歷次驗證紀錄會一併刪除。`)) return;
-  hypos.splice(i,1);
-  lsSet(LS.hypo, hypos);
-  renderHypotheses(window.__lastPerfSnapshot ? window.__lastPerfSnapshot.perfData : null);
-};
-document.getElementById('addHypoBtn').addEventListener('click', ()=>{
-  const desc = document.getElementById('hypoDesc').value.trim();
-  const keyword = document.getElementById('hypoKeyword').value.trim();
-  if(!desc || !keyword){ alert('請填寫假設描述與比對關鍵字'); return; }
-  const hypos = lsGet(LS.hypo, []);
-  hypos.push({desc, keyword, createdAt: new Date().toISOString().slice(0,10), history:[]});
-  lsSet(LS.hypo, hypos);
-  document.getElementById('hypoDesc').value=''; document.getElementById('hypoKeyword').value='';
-  renderHypotheses(window.__lastPerfSnapshot ? window.__lastPerfSnapshot.perfData : null);
-});
 
 // ── 歷史庫與備份 ───────────────────────────────────────
 function renderHistory(){
@@ -2624,7 +2427,6 @@ document.getElementById('exportFullBtn').addEventListener('click', async ()=>{
       version: 2,
       withImages: true,
       history: lsGet(LS.history, []),
-      hypotheses: lsGet(LS.hypo, []),
       market: packed,
       customDims: lsGet(LS.customDims, []),
       marketDims: lsGet(LS.marketDims, []),
@@ -2657,7 +2459,6 @@ document.getElementById('exportJsonBtn').addEventListener('click', ()=>{
     exportedAt: new Date().toISOString(),
     version: 2,
     history: lsGet(LS.history, []),
-    hypotheses: lsGet(LS.hypo, []),
     market: lsGet(LS.market, []),
     customDims: lsGet(LS.customDims, []),
     marketDims: lsGet(LS.marketDims, []),
@@ -2683,10 +2484,7 @@ document.getElementById('importJsonInput').addEventListener('change', e=>{
       const ids = new Set(cur.map(r=>r.id));
       (data.history||[]).forEach(r=>{ if(r.id && !ids.has(r.id)) cur.push(r); });
       lsSet(LS.history, cur);
-      const curH = lsGet(LS.hypo, []);
-      const keys = new Set(curH.map(h=>h.desc+'|'+h.keyword));
-      (data.hypotheses||[]).forEach(h=>{ if(!keys.has(h.desc+'|'+h.keyword)) curH.push(h); });
-      lsSet(LS.hypo, curH);
+      // 舊版備份可能含 hypotheses（假設追蹤已下架），略過不還原
       if(Array.isArray(data.market)){
         const curM = lsGet(LS.market, []);
         const mids = new Set(curM.map(m=>m.id));
@@ -2726,9 +2524,8 @@ document.getElementById('importJsonInput').addEventListener('change', e=>{
       }
       if(data.settings && typeof data.settings==='object'){ lsSet(LS.settings, Object.assign(lsGet(LS.settings, {}), data.settings)); loadSettings(); }
       renderHistory();
-      renderHypotheses(window.__lastPerfSnapshot ? window.__lastPerfSnapshot.perfData : null);
       const imgN = window.__importedImgCount || 0;
-      alert(`匯入完成：歷史紀錄 ${cur.length} 筆、假設 ${curH.length} 條`
+      alert(`匯入完成：歷史紀錄 ${cur.length} 筆`
         + (imgN ? `、素材圖 ${imgN} 張` : '')
         + `（已自動去重合併）`);
       window.__importedImgCount = 0;
@@ -2761,7 +2558,6 @@ document.getElementById('gasSyncBtn').addEventListener('click', async ()=>{
   const histItems = lsGet(LS.history, []);
   const newHistory = histItems.filter(h => !h.synced);
   
-  const hypoItems = lsGet(LS.hypo, []);
 
   if (!newOurMats.length && !newMktMats.length && !newHistory.length) {
     hintEl.textContent = '✓ 目前沒有新的資料或圖片需要同步。';
@@ -2786,7 +2582,6 @@ document.getElementById('gasSyncBtn').addEventListener('click', async ()=>{
         newHistory: (i === 0) ? newHistory.map(h => {
            return h.rows ? h.rows.map(r => Object.assign({}, r, { label: h.label })) : [];
         }).flat() : [], 
-        hypotheses: (i === 0) ? hypoItems : []
       };
 
       // 移除 no-cors，改為一般請求以捕捉真實 HTTP 狀態
@@ -3168,10 +2963,6 @@ document.getElementById('aiReportBtn').addEventListener('click', async ()=>{
     const { avgCTR, totalCost, angleWithScore, spAgg, ctxLabel } = snap;
     const angles = angleWithScore.map(a=>`${a.key}：CTR ${(a.ctr * 100).toFixed(2)}%、CPA ${a.cpa != null ? a.cpa.toFixed(2) : '-'}`).join('；');
     const tops = spAgg.slice(0, 5).map(s=>`${s.key} ${(s.ctr * 100).toFixed(2)}%`).join('、');
-    const hypos = lsGet(LS.hypo, []).map(h=>{
-      const last = (h.history || []).slice(-1)[0];
-      return `${h.desc}（關鍵字 ${h.keyword}${last ? `，最近差異 ${last.lift >= 0 ? '+' : ''}${last.lift.toFixed(1)}%` : ''}）`;
-    }).join('；');
     const txt = await callGemini([{ text: `你是遊戲營運行銷分析師，請撰寫一份給主管的素材成效週報（繁體中文）。
 
 【本期數據】情境：${ctxLabel}
@@ -3179,7 +2970,6 @@ document.getElementById('aiReportBtn').addEventListener('click', async ()=>{
 各切角：${angles}
 賣點 TOP5：${tops}
 ${lastAiSummary ? `AI 視覺洞察：${lastAiSummary}` : ''}
-${hypos ? `追蹤中的假設：${hypos}` : ''}
 
 請用以下結構撰寫，語氣專業精簡、可直接貼進週報，不要客套話：
 一、本期重點（2–3 句話總結）
@@ -3680,10 +3470,11 @@ function renderMarketList(){
     lsSet(LS.mkView, b.dataset.v); renderMarketList();
   }));
   list.querySelectorAll('.mkGameBtn').forEach(b=>b.addEventListener('click', ()=>{
-    lsSet(LS.mktGame, b.dataset.g || ''); renderMarketList(); renderSurvivalSplit();
+    lsSet(LS.mktGame, b.dataset.g || ''); renderMarketList();
   }));
   list.querySelectorAll('.mkDelBtn').forEach(b=>b.addEventListener('click', ()=>mkDelete(b.dataset.id)));
   renderMarketCompare();
+  renderDimShare();
   renderSurvivalSplit();
   if(typeof updateStorageHint==='function') updateStorageHint();
 }
@@ -4411,7 +4202,7 @@ function renderMarketCompare(){
     trap:   { label:'市場的陷阱', color:'var(--coral)', bg:'var(--coral-bg)', act:'不要跟風' },
     moat:   { label:'我們的優勢', color:'var(--teal)',  bg:'var(--teal-bg)',  act:'守住並放大' },
     cut:    { label:'該砍的慣性', color:'var(--amber)', bg:'var(--amber-bg)', act:'考慮停損' },
-    untest: { label:'尚未驗證',   color:'var(--text-muted)', bg:'#f1efe9',    act:'轉為假設測試' },
+    untest: { label:'尚未驗證',   color:'var(--text-muted)', bg:'#f1efe9',    act:'排入測試' },
   };
   const findings = [];
 
@@ -4474,13 +4265,9 @@ function renderMarketCompare(){
           <div class="quadItem">
             <b>${esc(f.dim)}＝${esc(f.key)}</b>
             <span class="quadMeta">市場 ${f.mkt.toFixed(0)}% · 我方 ${f.own.toFixed(0)}%${f.ctr!=null ? ` · 我方 CTR ${(f.ctr*100).toFixed(2)}%（${f.lift>=0?'+':''}${f.lift.toFixed(0)}%，${f.n} 支）` : ' · 我方尚無此類素材'}</span>
-            ${f.q==='untest' ? `<button class="gapBtn" data-key="${esc(f.key)}" data-dim="${esc(f.dim)}">＋轉為假設</button>` : ''}
           </div>`).join('')}
       </div>`;
     }).join('')}` : '<p class="sub" style="margin-top:12px;">尚無足夠證據形成決策建議（需要占比差異明顯、且我方有對應素材的成效資料）。</p>';
-  gapsEl.querySelectorAll('.gapBtn').forEach(btn=>{
-    btn.addEventListener('click', ()=>gapToHypo(btn.dataset.key, btn.dataset.dim));
-  });
 
   // 供「下一波素材建議」取用
   window.__lastCross = { findings, dOwn, dMkt, overall, ownN: own.length, mktN: mkt.length, ownPerfN: ownPerf.length };
@@ -4634,12 +4421,19 @@ ${extra ? `═══ 補充脈絡 ═══\n${extra}\n` : ''}
 ### 四、風險提醒
 指出上述建議中樣本數不足、或可能是相關而非因果的部分，避免過度解讀。
 
+輸出格式要求（很重要，會直接呈現給行銷團隊閱讀）：
+・四個大段一律用「### 一、」「### 二、」「### 三、」「### 四、」開頭，不要更動段名
+・每個要點獨立一行，用「- 」開頭，不要把多個要點擠在同一段
+・每個要點開頭先寫 5-12 字的重點結論，接冒號，再寫說明——讓人掃一眼就抓得到
+・需要小標時用 **粗體** 獨佔一行
+・不要用 markdown 表格、不要用巢狀縮排
+
 用字精準、避免空泛的行銷術語，每一項建議都要能對應回上面的數據。`;
 
     const txt = await callGemini([{ text: prompt }]);
     setProg('nwProgBar','nwProgText','nwProgress', 3, 3, '完成');
     window.__lastNextWave = txt;
-    out.innerHTML = `<div class="nwOut">${mdToCardHtml(txt, 'var(--teal)')}</div>`;
+    out.innerHTML = `<div class="nwOut">${renderAiSections(txt)}</div>`;
     copyBtn.style.display = '';
     setTimeout(()=>{ document.getElementById('nwProgress').style.display='none'; }, 900);
   }catch(e){
@@ -4687,6 +4481,145 @@ function attachListCollapse(container, key, label, count, defaultCollapsed){
     head.querySelector('.listHint').textContent = now ? '已收合，點擊展開' : '點擊收合';
   });
 }
+
+// ── AI 建議的結構化排版 ──────────────────────────────
+// AI 會回傳 ### 分段的 Markdown。過去直接丟進 pre-wrap 的區塊，
+// 換行被當成實體空白、段落全部黏在一起，讀起來像一坨純文字。
+// 這裡改成把每個 ### 區段切成獨立卡片，條列與粗體各自成形。
+function renderAiSections(text){
+  const raw = String(text || '').replace(/\r/g, '');
+  if(!raw.trim()) return '<p class="empty">AI 沒有回傳內容，請再試一次。</p>';
+
+  const inline = t => esc(t)
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<i>$1</i>')
+    .replace(/^([^：:]{2,14})[：:]\s*/, '<b>$1：</b>');
+
+  // 依 ### 切段；標題前的內容視為前言
+  const parts = raw.split(/^\s*#{2,4}\s*/m).map(x=>x.trim()).filter(Boolean);
+  const hasHead = /^\s*#{2,4}\s*/m.test(raw);
+  if(!hasHead){
+    return `<div class="nwSec"><div class="nwBody">${blockHtml(raw, inline)}</div></div>`;
+  }
+  return parts.map((seg, idx)=>{
+    const nl = seg.indexOf('\n');
+    const title = (nl < 0 ? seg : seg.slice(0, nl)).replace(/\*\*/g, '').trim();
+    const body = nl < 0 ? '' : seg.slice(nl + 1);
+    const risk = /風險|弱點|提醒|注意|限制/.test(title);
+    const no = title.match(/^[一二三四五六七八九十]+[、.]/) ? title[0] : String(idx + 1);
+    return `<div class="nwSec${risk ? ' risk' : ''}">
+      <div class="nwSecHead"><span class="nwSecNo">${esc(no)}</span><span class="nwSecTitle">${esc(title.replace(/^[一二三四五六七八九十]+[、.]\s*/, ''))}</span></div>
+      <div class="nwBody">${blockHtml(body, inline)}</div>
+    </div>`;
+  }).join('');
+}
+
+function blockHtml(text, inline){
+  const out = [];
+  String(text || '').split(/\n/).forEach(line=>{
+    const t = line.trim();
+    if(!t) return;
+    // 粗體獨佔一行 → 視為小標
+    const strongOnly = t.match(/^\*\*(.+?)\*\*[：:]?$/);
+    if(strongOnly){ out.push(`<p class="nwSub">${esc(strongOnly[1])}</p>`); return; }
+    const li = t.match(/^(?:[-*・•]|\d+[.)、])\s+(.+)$/);
+    if(li){ out.push(`<div class="nwLi"><span class="b"></span><span class="t">${inline(li[1])}</span></div>`); return; }
+    out.push(`<p class="nwP">${inline(t)}</p>`);
+  });
+  return out.join('') || '<p class="nwP" style="color:var(--text-muted);">（此段無內容）</p>';
+}
+
+// ══════════════════════════════════════════════════════════
+// 各維度占比分析：市場素材的完整特徵輪廓
+// 存活加權看的是「競品實際在推什麼」，計數看的是「競品做過什麼」，
+// 兩者落差大的維度本身就是訊號。
+// ══════════════════════════════════════════════════════════
+LS.dsW = 'mt_ds_weight';
+LS.dsSort = 'mt_ds_sort';
+
+function renderDimShare(){
+  const el = document.getElementById('dsOutput');
+  if(!el) return;
+  const items = marketScope().filter(i=>i.tags);
+  if(items.length < 3){
+    el.innerHTML = `<p class="empty">需要至少 3 支已標籤的市場素材，${esc(scopeLabel())}目前 ${items.length} 支。</p>`;
+    return;
+  }
+  const mode = lsGet(LS.dsW, 'sv');
+  const sortBy = lsGet(LS.dsSort, 'conc');
+  document.querySelectorAll('.dsWBtn').forEach(b=>{
+    b.style.borderColor = b.dataset.w === mode ? 'var(--teal)' : '';
+    b.style.color = b.dataset.w === mode ? 'var(--teal)' : '';
+  });
+  document.querySelectorAll('.dsSBtn').forEach(b=>{
+    b.style.borderColor = b.dataset.s === sortBy ? 'var(--teal)' : '';
+    b.style.color = b.dataset.s === sortBy ? 'var(--teal)' : '';
+  });
+
+  const dims = marketAllDims();
+  const recs = items.map(i=>({ tags:i.tags, w: mode==='sv' ? survivalDaysOf(i) : 1 }));
+  const dist = distShare(recs, dims);
+  const cnt  = distShare(items.map(i=>({tags:i.tags, w:1})), dims);
+  const mDims = new Set(getMarketDims().map(d=>d.name));
+
+  const blocks = dims.map(dim=>{
+    const m = dist[dim];
+    if(!m) return { dim, html:null, conc:-1, filled:0 };
+    const keys = Object.keys(m).sort((a,b)=>m[b]-m[a]);
+    const top = m[keys[0]] || 0;
+    // 有標到這一維的素材數（用來提示樣本代表性）
+    const filled = items.filter(i=>i.tags[dim]!=null && i.tags[dim]!=='').length;
+    const rows = keys.slice(0,6).map(k=>{
+      const share = m[k];
+      const c = (cnt[dim] && cnt[dim][k]) || 0;
+      const gap = share - c;
+      // 加權與計數差距大 → 這個選項在長跑素材上被放大或縮小
+      const flag = (mode==='sv' && Math.abs(gap) >= 12)
+        ? `<span class="dsGap ${gap>0?'up':'down'}" title="與單純計數的差距">${gap>0?'▲':'▼'}${Math.abs(gap).toFixed(0)}</span>` : '';
+      return `<div class="dsRow">
+          <span class="dsKey" title="${esc(k)}">${esc(k)}</span>
+          <span class="dsBarWrap"><span class="dsBar" style="width:${Math.max(1,share).toFixed(0)}%;"></span></span>
+          <span class="dsPct">${share.toFixed(0)}%</span>${flag}
+        </div>`;
+    }).join('');
+    const more = keys.length > 6 ? `<p class="dsMore">另有 ${keys.length-6} 個選項未列出</p>` : '';
+    const badge = mDims.has(dim) ? '<span class="dsTag mk">市場專屬</span>' : '';
+    const warn = filled < items.length
+      ? `<span class="dsTag warn" title="部分素材未標註此維度">${filled}/${items.length} 支有標</span>` : '';
+    return {
+      dim, conc: top, filled,
+      html: `<div class="dsCard">
+        <p class="dsDim">${esc(dim)}${badge}${warn}</p>
+        ${rows}${more}
+      </div>`
+    };
+  }).filter(b=>b.html);
+
+  if(!blocks.length){ el.innerHTML = '<p class="empty">市場素材尚無有效標籤。</p>'; return; }
+  if(sortBy === 'conc') blocks.sort((a,b)=>b.conc - a.conc);
+
+  const conc = blocks.filter(b=>b.conc >= 80);
+  const spread = blocks.filter(b=>b.conc < 50);
+  el.innerHTML = `
+    <div class="dsMeta">
+      <span>${esc(scopeLabel())}・${items.length} 支已標籤</span>
+      <span>${blocks.length} 個維度有資料</span>
+      <span>${mode==='sv' ? '以存活天數加權' : '每支素材等重'}</span>
+    </div>
+    <div class="dsGrid">${blocks.map(b=>b.html).join('')}</div>
+    <p class="dsNote">
+      ${conc.length ? `<b>高度集中（單一選項 ≥80%）：</b>${conc.slice(0,6).map(b=>esc(b.dim)).join('、')}——競品在這些維度上做法一致，可視為該品類的預設做法。<br>` : ''}
+      ${spread.length ? `<b>做法分散（最高選項 &lt;50%）：</b>${spread.slice(0,6).map(b=>esc(b.dim)).join('、')}——競品自己也在測試，這些維度還沒有標準答案。<br>` : ''}
+      ${mode==='sv' ? '▲▼ 標記代表加權後與單純計數的差距達 12 個百分點以上：▲ 表示這個選項集中在長跑素材上，▼ 表示多出現在短命素材上。' : ''}
+    </p>`;
+}
+
+document.querySelectorAll('.dsWBtn').forEach(b=>b.addEventListener('click', ()=>{
+  lsSet(LS.dsW, b.dataset.w); renderDimShare();
+}));
+document.querySelectorAll('.dsSBtn').forEach(b=>b.addEventListener('click', ()=>{
+  lsSet(LS.dsSort, b.dataset.s); renderDimShare();
+}));
 
 // ══════════════════════════════════════════════════════════
 // 競品自驗證：長存活 vs 短存活
@@ -4808,19 +4741,11 @@ ${lines}
 用字精準，每個結論都要對應回上面的數據。`;
     const txt = await callGemini([{ text: prompt }]);
     window.__lastSurvivalAi = txt;
-    out.innerHTML = `<div class="nwOut">${mdToCardHtml(txt, 'var(--teal)')}</div>`;
+    out.innerHTML = `<div class="nwOut">${renderAiSections(txt)}</div>`;
   }catch(e){
     out.innerHTML = `<p class="empty" style="color:var(--coral);">✗ ${esc(e.message)}</p>`;
   }finally{ btn.disabled = false; }
 });
-
-function gapToHypo(key, dim){
-  document.getElementById('hypoDesc').value = `市場高頻特徵驗證：${dim}＝${key} 可提升 CTR`;
-  document.getElementById('hypoKeyword').value = key;
-  const descEl = document.getElementById('hypoDesc');
-  if(descEl.scrollIntoView) descEl.scrollIntoView({behavior:'smooth', block:'center'});
-  alert('已帶入假設欄位。提醒：關鍵字需出現在素材名稱或賣點中才能自動驗證，請視命名習慣調整（例如把「情感懷舊」改為「懷舊」）。');
-};
 
 // ── 週報圖卡匯出 ───────────────────────────────────────
 // 週報圖卡用的輕量 Markdown 轉換
@@ -4923,334 +4848,6 @@ document.getElementById('exportCardBtn').addEventListener('click', async ()=>{
   }catch(err){ alert('圖卡產生失敗：' + err.message); }
 });
 
-// ══════════════════════════════════════════════════════════
-// 每日戰報產生器
-// 設計：能自動算的（CPA、進度、標籤 Top/Bottom）自動帶入；
-//       人工才知道的（走期、預算、輿情）手動填；歸因與行動可由 AI 草擬。
-// ══════════════════════════════════════════════════════════
-const DP_KEY = 'mt_daily_draft';
-const dpEl = id => document.getElementById(id);
-const dpNum = id => { const v = parseFloat((dpEl(id).value || '').trim()); return isNaN(v) ? null : v; };
-const dpStr = id => (dpEl(id).value || '').trim();
-
-// 草稿存本機，隔天開啟不用重填走期與預算
-function dpSaveDraft(){
-  const ids = ['dpDay','dpTotalDay','dpSpent','dpBudget','dpNonMedia','dpTargetCpa',
-               'dpTodayCost','dpTodayConv','dpYestCpa','dpReason','dpBuzz','dpBuzzAction'];
-  const o = {}; ids.forEach(i=>{ o[i] = dpEl(i) ? dpEl(i).value : ''; });
-  lsSet(DP_KEY, o);
-}
-function dpLoadDraft(){
-  const o = lsGet(DP_KEY, null);
-  if(!o) return;
-  Object.keys(o).forEach(i=>{ if(dpEl(i)) dpEl(i).value = o[i]; });
-}
-
-// 從已解析資料取素材標籤表現（依 CPA，樣本量足夠者優先）
-function dpTagPerf(){
-  const snap = window.__lastPerfSnapshot;
-  if(!snap || !snap.angleWithScore || !snap.angleWithScore.length) return null;
-  const thr = getImprThreshold();
-  const pool = snap.angleWithScore.filter(a => a.cpa != null && a.impr >= thr);
-  const use = pool.length >= 2 ? pool : snap.angleWithScore.filter(a => a.cpa != null);
-  if(use.length < 1) return null;
-  const byCpa = [...use].sort((a,b) => a.cpa - b.cpa);
-  return { best: byCpa[0], worst: byCpa[byCpa.length - 1], lowSample: pool.length < 2 };
-}
-
-// 計算所有衍生數字
-function dpCompute(){
-  const day = dpNum('dpDay'), totalDay = dpNum('dpTotalDay');
-  const spent = dpNum('dpSpent'), budget = dpNum('dpBudget');
-  const nonMedia = dpNum('dpNonMedia');
-  const target = dpNum('dpTargetCpa');
-  const tCost = dpNum('dpTodayCost'), tConv = dpNum('dpTodayConv');
-  const yCpa = dpNum('dpYestCpa');
-
-  const dayPct = (day != null && totalDay) ? day / totalDay * 100 : null;
-  const budgetPct = (spent != null && budget) ? spent / budget * 100 : null;
-  const mediaCost = (spent != null && nonMedia != null) ? spent - nonMedia : null;
-  const mediaPct = (mediaCost != null && spent) ? mediaCost / spent * 100 : null;
-  const nonMediaPct = (nonMedia != null && spent) ? nonMedia / spent * 100 : null;
-  const todayCpa = (tCost != null && tConv) ? tCost / tConv : null;
-
-  // 累積 CPA：優先用手填的累積花費 ÷ 已解析資料的累積轉換
-  const snap = window.__lastPerfSnapshot;
-  let cumConv = null, cumCpa = null;
-  if(snap && Array.isArray(snap.perfData)){
-    cumConv = snap.perfData.reduce((s, r) => s + (Number(r.預約次數) || 0), 0) || null;
-  }
-  const cumCostForCpa = (mediaCost != null) ? mediaCost : spent;   // 有拆非媒體就用純媒體費算
-  if(cumCostForCpa != null && cumConv) cumCpa = cumCostForCpa / cumConv;
-
-  const cpaChange = (todayCpa != null && yCpa) ? (todayCpa - yCpa) / yCpa * 100 : null;
-  const vsTarget = (cumCpa != null && target) ? (cumCpa - target) / target * 100 : null;
-  // 預算消耗是否超前：花費比例 vs 時間比例
-  const paceGap = (budgetPct != null && dayPct != null) ? budgetPct - dayPct : null;
-
-  return { day, totalDay, dayPct, spent, budget, budgetPct, nonMedia, mediaCost, mediaPct, nonMediaPct,
-           target, tCost, tConv, todayCpa, cumConv, cumCpa, yCpa, cpaChange, vsTarget, paceGap };
-}
-
-function dpFmtMoney(v){ return v == null ? '—' : '$' + Math.round(v).toLocaleString(); }
-function dpFmtCpa(v){ return v == null ? '—' : '$' + v.toFixed(0); }
-function dpFmtPct(v, digits){ return v == null ? '—' : v.toFixed(digits == null ? 1 : digits) + '%'; }
-function dpSign(v){ return v == null ? '' : (v >= 0 ? '+' : ''); }
-
-// 上方即時統計卡
-function dpRenderStats(c){
-  const el = dpEl('dpAutoPanel');
-  const cards = [];
-  cards.push({ k:'走期進度', v: (c.day != null && c.totalDay) ? `Day ${c.day} / ${c.totalDay}` : '—',
-               s: c.dayPct != null ? `已過 ${dpFmtPct(c.dayPct, 0)}` : '' });
-  cards.push({ k:'預算使用率', v: dpFmtPct(c.budgetPct, 1),
-               s: (c.spent != null && c.budget) ? `${dpFmtMoney(c.spent)} / ${dpFmtMoney(c.budget)}` : '',
-               cls: c.paceGap != null ? (c.paceGap > 10 ? 'warn' : (c.paceGap < -10 ? 'good' : '')) : '' });
-  cards.push({ k:'今日 CPA', v: dpFmtCpa(c.todayCpa),
-               s: c.cpaChange != null ? `較昨日 ${dpSign(c.cpaChange)}${c.cpaChange.toFixed(1)}%` : '',
-               cls: c.cpaChange != null ? (c.cpaChange > 0 ? 'warn' : 'good') : '' });
-  cards.push({ k:'累積 CPA', v: dpFmtCpa(c.cumCpa),
-               s: c.vsTarget != null ? `vs 目標 ${dpSign(c.vsTarget)}${c.vsTarget.toFixed(1)}%` : (c.target ? `目標 $${c.target}` : ''),
-               cls: c.vsTarget != null ? (c.vsTarget > 0 ? 'warn' : 'good') : '' });
-  cards.push({ k:'今日導入量', v: c.tConv != null ? c.tConv.toLocaleString() : '—', s:'新增人數' });
-  el.innerHTML = `<div class="dpStat">` + cards.map(x =>
-    `<div class="dpCard${x.cls ? ' ' + x.cls : ''}">
-       <p class="k">${esc(x.k)}</p><p class="v">${esc(x.v)}</p>
-       ${x.s ? `<p class="s">${esc(x.s)}</p>` : ''}
-     </div>`).join('') + `</div>`;
-}
-
-// 組出四段式戰報文字
-function dpBuildReport(c, aiText){
-  const today = new Date().toISOString().slice(0, 10);
-  const tag = dpTagPerf();
-  const L = [];
-  L.push(`【每日戰報】${today}`);
-  L.push('');
-  L.push('1. 核心指標與預算進度');
-  L.push(`・走期進度：Day ${c.day != null ? c.day : 'X'} / ${c.totalDay != null ? c.totalDay : 'Y'}` +
-         (c.dayPct != null ? `（已過 ${dpFmtPct(c.dayPct, 0)}）` : ''));
-  let budgetLine = `・累積預算使用率：${dpFmtMoney(c.spent)} / ${dpFmtMoney(c.budget)}` +
-                   (c.budgetPct != null ? `（${dpFmtPct(c.budgetPct, 1)}）` : '');
-  if(c.nonMedia != null && c.nonMedia > 0 && c.mediaPct != null){
-    budgetLine += `　｜　媒體費 ${dpFmtPct(c.mediaPct, 0)}、非媒體費 ${dpFmtPct(c.nonMediaPct, 0)}`;
-  }
-  L.push(budgetLine);
-  if(c.paceGap != null){
-    const pace = c.paceGap > 5 ? `消耗超前時程 ${c.paceGap.toFixed(1)} 個百分點`
-              : c.paceGap < -5 ? `消耗落後時程 ${Math.abs(c.paceGap).toFixed(1)} 個百分點`
-              : '消耗與時程同步';
-    L.push(`　（${pace}）`);
-  }
-  L.push(`・今日 CPA vs 累積 CPA：${dpFmtCpa(c.todayCpa)} / ${dpFmtCpa(c.cumCpa)}` +
-         (c.target ? `（目標 CPA：$${c.target}）` : ''));
-  // 標明累積 CPA 的計算基礎：轉換數來自目前情境的已解析資料，切換情境數字會變
-  if(c.cumCpa != null){
-    const snapCtx = (window.__lastPerfSnapshot && window.__lastPerfSnapshot.ctxLabel) || '';
-    L.push(`　（累積 CPA 基數：${c.cumConv ? c.cumConv.toLocaleString() : '—'} 筆轉換` +
-           (snapCtx ? `，範圍：${snapCtx}` : '') +
-           (c.mediaCost != null ? '，已扣除非媒體費用' : '') + '）');
-  }
-  L.push(`・今日新增導入量：${c.tConv != null ? c.tConv.toLocaleString() : 'XX'} 人`);
-  L.push('');
-  L.push('2. 數據動態與歸因分析');
-  if(c.cpaChange != null){
-    L.push(`・今日成效變化：CPA 較昨日 ${c.cpaChange >= 0 ? '上升' : '下降'} ${Math.abs(c.cpaChange).toFixed(1)}%` +
-           (dpStr('dpReason') ? `，主要原因為 ${dpStr('dpReason')}。` : '。'));
-  }else{
-    L.push(`・今日成效變化：${dpStr('dpReason') || '（待填：CPA 變化與主因）'}`);
-  }
-  L.push('・素材標籤表現（Top & Bottom）：');
-  if(tag){
-    L.push(`　- 成效最佳：「${tag.best.key}」（CPA ${dpFmtCpa(tag.best.cpa)}、CTR ${(tag.best.ctr * 100).toFixed(2)}%）`);
-    L.push(`　- 待優化：「${tag.worst.key}」（CPA ${dpFmtCpa(tag.worst.cpa)}、CTR ${(tag.worst.ctr * 100).toFixed(2)}%）`);
-    if(tag.lowSample) L.push('　（註：部分切角樣本量偏低，數字僅供參考）');
-  }else{
-    L.push('　- （尚未載入成效資料，或無足夠樣本可判讀）');
-  }
-  L.push('');
-  L.push('3. 數據缺口與行動方案');
-  if(c.vsTarget != null){
-    L.push(`・當前風險：累積 CPA ${dpFmtCpa(c.cumCpa)} ${c.vsTarget >= 0 ? '高於' : '低於'} 目標 $${c.target} 約 ${Math.abs(c.vsTarget).toFixed(1)}%。`);
-  }else{
-    L.push('・當前風險：（需填入目標 CPA 才能比較）');
-  }
-  L.push('・挽救／修正計畫（明日至本週）：');
-  L.push('　- 渠道調整：');
-  L.push('　- 素材替換：');
-  L.push('　- 受眾優化：');
-  L.push('');
-  L.push('4. 社群輿情與行銷加分操作');
-  L.push(`・本日焦點議題：${dpStr('dpBuzz') || '（待填）'}`);
-  L.push(`・行銷順勢操作：${dpStr('dpBuzzAction') || '（待填）'}`);
-  let out = L.join('\n');
-  if(aiText) out = dpMergeAi(out, aiText);
-  return out;
-}
-
-// 把 AI 草擬的內容填進第 2、3 段的空白處
-function dpMergeAi(base, ai){
-  let o;
-  try{ o = typeof ai === 'string' ? JSON.parse(ai) : ai; }catch(e){ return base + '\n\n【AI 建議】\n' + ai; }
-  let out = base;
-  if(o.歸因){
-    out = out.replace('・素材標籤表現（Top & Bottom）：',
-      `・歸因分析：${o.歸因}\n・素材標籤表現（Top & Bottom）：`);
-  }
-  const plan = o.行動方案 || {};
-  if(plan.渠道調整) out = out.replace('　- 渠道調整：', `　- 渠道調整：${plan.渠道調整}`);
-  if(plan.素材替換) out = out.replace('　- 素材替換：', `　- 素材替換：${plan.素材替換}`);
-  if(plan.受眾優化) out = out.replace('　- 受眾優化：', `　- 受眾優化：${plan.受眾優化}`);
-  return out;
-}
-
-function dpRun(aiText){
-  const c = dpCompute();
-  dpRenderStats(c);
-  const txt = dpBuildReport(c, aiText);
-  dpEl('dpOut').value = txt;
-  dpEl('dpOutWrap').style.display = '';
-  dpEl('dpCopyBtn').style.display = '';
-  dpEl('dpCardBtn').style.display = '';
-  dpSaveDraft();
-  return c;
-}
-
-dpEl('dpCalcBtn').addEventListener('click', ()=>{
-  dpRun(null);
-  dpEl('dpHint').style.color = 'var(--text-secondary)';
-  dpEl('dpHint').textContent = '已產生。可直接編輯上方文字，或按 AI 草擬補上歸因與行動方案。';
-});
-
-// 非媒體費用即時顯示佔比
-dpEl('dpNonMedia').addEventListener('input', ()=>{
-  const nm = dpNum('dpNonMedia'), sp = dpNum('dpSpent');
-  dpEl('dpNonMediaHint').textContent = (nm != null && sp) ? `佔累積花費 ${(nm / sp * 100).toFixed(1)}%` : '';
-});
-
-dpEl('dpCopyBtn').addEventListener('click', async ()=>{
-  try{
-    await navigator.clipboard.writeText(dpEl('dpOut').value);
-    dpEl('dpHint').style.color = 'var(--gold)';
-    dpEl('dpHint').textContent = '✓ 已複製到剪貼簿';
-  }catch(e){
-    dpEl('dpOut').select();
-    dpEl('dpHint').textContent = '請按 Ctrl/Cmd + C 複製';
-  }
-});
-
-// AI 草擬歸因與行動方案
-dpEl('dpAiBtn').addEventListener('click', async ()=>{
-  const btn = dpEl('dpAiBtn'), hint = dpEl('dpHint');
-  if(!getApiKey()){ hint.style.color = 'var(--coral)'; hint.textContent = '請先在「AI 視覺特徵分析」設定 API Key'; return; }
-  const c = dpCompute();
-  const tag = dpTagPerf();
-  btn.disabled = true;
-  hint.style.color = 'var(--text-secondary)';
-  hint.textContent = 'AI 草擬中…';
-  try{
-    const ctx = [
-      `走期：Day ${c.day || '?'} / ${c.totalDay || '?'}`,
-      c.budgetPct != null ? `預算使用率 ${c.budgetPct.toFixed(1)}%（${dpFmtMoney(c.spent)} / ${dpFmtMoney(c.budget)}）` : '',
-      c.paceGap != null ? `消耗較時程 ${c.paceGap >= 0 ? '超前' : '落後'} ${Math.abs(c.paceGap).toFixed(1)} 個百分點` : '',
-      c.todayCpa != null ? `今日 CPA ${dpFmtCpa(c.todayCpa)}` : '',
-      c.cumCpa != null ? `累積 CPA ${dpFmtCpa(c.cumCpa)}` : '',
-      c.target ? `目標 CPA $${c.target}` : '',
-      c.vsTarget != null ? `累積 CPA 較目標 ${c.vsTarget >= 0 ? '高' : '低'} ${Math.abs(c.vsTarget).toFixed(1)}%` : '',
-      c.cpaChange != null ? `今日 CPA 較昨日 ${c.cpaChange >= 0 ? '上升' : '下降'} ${Math.abs(c.cpaChange).toFixed(1)}%` : '',
-      c.tConv != null ? `今日導入量 ${c.tConv} 人` : '',
-      dpStr('dpReason') ? `已知變化原因：${dpStr('dpReason')}` : '',
-      tag ? `成效最佳切角：${tag.best.key}（CPA ${dpFmtCpa(tag.best.cpa)}、CTR ${(tag.best.ctr*100).toFixed(2)}%）` : '',
-      tag ? `待優化切角：${tag.worst.key}（CPA ${dpFmtCpa(tag.worst.cpa)}、CTR ${(tag.worst.ctr*100).toFixed(2)}%）` : '',
-      dpStr('dpBuzz') ? `社群焦點：${dpStr('dpBuzz')}` : '',
-    ].filter(Boolean).join('\n');
-
-    const prompt = `你是遊戲買量投放的營運分析師。根據以下今日投放數據，撰寫歸因分析與具體行動方案（繁體中文，語氣專業精簡，可直接貼進戰報，不要客套話）。
-
-【今日數據】
-${ctx}
-
-要求：
-1. 歸因要講「為什麼」，結合數據推論可能原因，不要只複述數字。
-2. 行動方案要具體可執行，包含明確比例或標的（例如「將 20% 預算由 A 移至 B」）。
-3. 若數據顯示 CPA 高於目標，行動方案要以拉低 CPA 為優先。
-
-只回傳 JSON，格式如下，不要加任何說明文字或 markdown 標記：
-{"歸因":"（2-3 句話的歸因分析）","行動方案":{"渠道調整":"（一句具體做法）","素材替換":"（一句具體做法）","受眾優化":"（一句具體做法）"}}`;
-
-    const txt = await callGemini([{ text: prompt }], { json: true, timeoutMs: 60000 });
-    dpRun(txt);
-    hint.style.color = 'var(--gold)';
-    hint.textContent = '✓ AI 已草擬完成，請確認內容後再送出（數字以工具計算為準）';
-  }catch(e){
-    hint.style.color = 'var(--coral)';
-    hint.textContent = 'AI 草擬失敗：' + e.message + '（可先按「計算並產生戰報」手動填寫）';
-  }finally{
-    btn.disabled = false;
-  }
-});
-
-// 匯出戰報圖卡
-dpEl('dpCardBtn').addEventListener('click', async ()=>{
-  const txt = dpEl('dpOut').value;
-  if(!txt.trim()){ return; }
-  const gold = '#E8C877', sub = '#9AA6BF', card = '#1A2440', line = '#2B3A5E';
-  const today = new Date().toISOString().slice(0, 10);
-  const c = dpCompute();
-  const el = document.getElementById('reportCard');
-  const stat = (k, v, s, col) => `
-    <div style="flex:1; background:${card}; border:1px solid ${line}; border-radius:12px; padding:14px 18px;">
-      <div style="font-size:12px; color:${sub};">${esc(k)}</div>
-      <div style="font-size:26px; font-weight:700; color:${col || '#F2EDE3'}; margin-top:2px;">${esc(v)}</div>
-      ${s ? `<div style="font-size:11.5px; color:${sub}; margin-top:2px;">${esc(s)}</div>` : ''}
-    </div>`;
-  const warnCol = '#C96B6B', goodCol = '#6FBF8F';
-  el.innerHTML = `
-    <div style="font-size:13px; letter-spacing:3px; color:${gold}; margin-bottom:6px;">LINEAGE M · DAILY CAMPAIGN REPORT</div>
-    <div style="font-size:30px; font-weight:700; margin-bottom:4px;">每日戰報</div>
-    <div style="font-size:14px; color:${sub}; margin-bottom:24px;">${today}${c.day != null && c.totalDay ? `　·　Day ${c.day} / ${c.totalDay}` : ''}</div>
-    <div style="display:flex; gap:14px; margin-bottom:14px;">
-      ${stat('預算使用率', dpFmtPct(c.budgetPct, 1), (c.spent != null && c.budget) ? `${dpFmtMoney(c.spent)} / ${dpFmtMoney(c.budget)}` : '', gold)}
-      ${stat('今日 CPA', dpFmtCpa(c.todayCpa), c.cpaChange != null ? `較昨日 ${dpSign(c.cpaChange)}${c.cpaChange.toFixed(1)}%` : '', c.cpaChange != null && c.cpaChange > 0 ? warnCol : goodCol)}
-      ${stat('累積 CPA', dpFmtCpa(c.cumCpa), c.vsTarget != null ? `vs 目標 ${dpSign(c.vsTarget)}${c.vsTarget.toFixed(1)}%` : '', c.vsTarget != null && c.vsTarget > 0 ? warnCol : goodCol)}
-      ${stat('今日導入量', c.tConv != null ? c.tConv.toLocaleString() : '—', '新增人數', '#F2EDE3')}
-    </div>
-    <div style="background:${card}; border:1px solid ${line}; border-radius:12px; padding:20px 24px; font-size:13.5px; line-height:1.85; color:#F2EDE3; word-break:break-word;">
-      ${dpReportToHtml(txt, gold)}
-    </div>
-    <div style="margin-top:26px; padding-top:14px; border-top:1px solid ${line}; font-size:12px; color:${sub};">天堂M 運營部 · 素材成效分析工具自動產出</div>`;
-  try{
-    const fullW = el.offsetWidth || 1080;
-    const fullH = Math.max(Math.ceil(el.scrollHeight || 0), Math.ceil(el.offsetHeight || 0),
-                           Math.ceil(el.getBoundingClientRect().height || 0), 600);
-    const canvas = await html2canvas(el, { backgroundColor:'#0E1526', scale:2, useCORS:true, allowTaint:true,
-      width: fullW, height: fullH, windowWidth: fullW, windowHeight: fullH, scrollX:0, scrollY:0 });
-    const a = document.createElement('a');
-    a.href = canvas.toDataURL('image/png');
-    a.download = `每日戰報_${today}.png`;
-    a.click();
-    dpEl('dpHint').style.color = 'var(--gold)';
-    dpEl('dpHint').textContent = '✓ 圖卡已匯出';
-  }catch(err){
-    dpEl('dpHint').style.color = 'var(--coral)';
-    dpEl('dpHint').textContent = '圖卡產生失敗：' + err.message;
-  }
-});
-
-// 戰報純文字 → 圖卡 HTML（標題、條列上色）
-function dpReportToHtml(text, gold){
-  return esc(String(text || '')).split(/\r?\n/).map(line=>{
-    const t = line.trim();
-    if(!t) return '<div style="height:9px;"></div>';
-    if(/^【.*】/.test(t)) return `<div style="font-size:15px; font-weight:700; color:${gold}; margin-bottom:8px;">${t}</div>`;
-    if(/^\d\.\s/.test(t)) return `<div style="font-size:14.5px; font-weight:700; color:${gold}; margin:14px 0 6px;">${t}</div>`;
-    if(/^・/.test(t)) return `<div style="margin:3px 0;">${t}</div>`;
-    if(/^　?-\s/.test(t)) return `<div style="margin:2px 0 2px 18px; color:#D9D3C6;">${t}</div>`;
-    return `<div style="margin:3px 0;">${t}</div>`;
-  }).join('');
-}
-
-dpLoadDraft();
 
 
 // 走期篩選事件
@@ -5266,7 +4863,6 @@ document.querySelectorAll('input[name="dateMode"]').forEach(r=>{
 // 初始化
 loadSettings();
 renderHistory();
-renderHypotheses(null);
 initMarket().then(()=>initOwnState()).then(()=>checkMetaInbox()).catch(e=>console.warn("還原上次分析失敗", e));
 // 書籤以 ?meta_inbox=1 開啟本工具時，顯示等待接收提示
 if(/[?&]meta_inbox=1/.test(location.search)){

@@ -209,6 +209,8 @@
   tr.lowSample td{color:var(--text-muted);}
   .checkPanel{border-radius:10px; padding:12px 16px; font-size:13px; margin-bottom:18px;}
   .checkPanel.ok{background:var(--teal-bg); color:var(--teal);}
+  .checkPanel.err{background:#fdf0ee; border-color:var(--coral); color:#8c3b2c;}
+  .checkPanel.err code{background:rgba(201,107,107,.16); padding:1px 5px; border-radius:3px;}
   .checkPanel.warn{background:var(--amber-bg); color:var(--amber);}
   .checkPanel ul{margin:8px 0 0; padding-left:18px;}
   .checkPanel li{font-size:12.5px; margin:2px 0;}
@@ -334,8 +336,8 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>天堂M 素材成效分析工具 <span style="font-size:12px; color:var(--text-muted); font-weight:400;">v2</span></h1>
-  <p class="sub">上傳「素材分析」格式的 Excel，自動拆解素材特徵並產出成效洞察。v2.4：AI 視覺標籤、競品素材交叉分析、長短存活自驗證、下一波素材建議、歷史庫備份。</p>
+  <h1>天堂M 素材成效分析工具 <span style="font-size:12px; color:var(--text-muted); font-weight:400;">v2.5</span></h1>
+  <p class="sub">上傳「素材分析」格式的 Excel，自動拆解素材特徵並產出成效洞察。v2.5：AI 視覺標籤、七項指標交叉分析、競品自驗證與維度共同性排行、下一波素材建議、Gemini 用量監控。</p>
 
   <div class="uploadBox" id="uploadBox">
     <p class="main">點擊或拖曳 Excel 檔案到這裡（.xlsx）</p>
@@ -1004,13 +1006,24 @@ function parseMaterialName(raw){
   const name = String(raw).split('\n')[0];
   const parts = name.split('_');
   const seg = i => parts[i] ? parts[i].trim() : null;
+  const has5 = parts.length>=5 && [0,1,2,3,4].every(i=>seg(i));
+  // 段數超過 5 代表某一段裡混進了底線（例：技能_覺醒）。
+  // 這種情況前 5 段都有值、看似「完整」，但賣點與走期實際上已經錯位，
+  // 而且畫面不會有任何異狀——所以要單獨標記出來。
+  const 段數異常 = parts.length > 5;
+  // 走期段若不含任何數字，幾乎可以確定是錯位（正常走期一定有數字）
+  const p5 = seg(4);
+  const 走期可疑 = !!p5 && !/\d/.test(p5);
   return {
     格式: seg(0),
     視覺類型: seg(1),
     素材切角: seg(2),
     賣點: seg(3),
-    走期: seg(4),
-    命名完整: parts.length>=5 && [0,1,2,3,4].every(i=>seg(i)),
+    走期: p5,
+    命名完整: has5 && !段數異常 && !走期可疑,
+    段數: parts.length,
+    段數異常,
+    走期可疑,
     素材名稱: name
   };
 }
@@ -1023,6 +1036,7 @@ function parseSheet(sheetName){
   const ws = workbook.Sheets[sheetName];
   if(!ws){ errArea.innerHTML = `<div class="errBox">找不到分頁「${sheetName}」。</div>`; return; }
   const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+  SKIPPED = [];
 
   // 找出標頭列：支援兩種格式
   //  A. 舊格式：一欄「素材名稱」（五段式命名字串）
@@ -1091,7 +1105,12 @@ function parseSheet(sheetName){
       theme = theme.trim();
       if(!theme) continue;
       const click = r[ci.click], impr = r[ci.impr];
-      if(typeof click !== 'number' || typeof impr !== 'number') continue;
+      if(typeof click !== 'number' || typeof impr !== 'number'){
+        SKIPPED.push({ name: String(theme||'').slice(0,60), row: i + 1,
+                       click: click==null?'(空白)':String(click).slice(0,20),
+                       impr:  impr==null?'(空白)':String(impr).slice(0,20) });
+        continue;
+      }
       if(ci.d0>=0 && r[ci.d0]!=null){ curD0 = mmdd(r[ci.d0]); curI0 = toIso(r[ci.d0]); }
       if(ci.d1>=0 && r[ci.d1]!=null){ curD1 = mmdd(r[ci.d1]); curI1 = toIso(r[ci.d1]); }
       const ch = ci.ch>=0 ? String(r[ci.ch]||'').trim() : '';
@@ -1152,11 +1171,24 @@ function parseSheet(sheetName){
       const ch = idx.channel>=0 ? r[idx.channel] : null;
       if(ch) currentChannel = ch;
       const nameVal = r[idx.name];
-      if(!nameVal) continue;
+      // 結束標記可能寫在任何一欄（實務上常放在第一欄當段落標題）。
+      // 只檢查素材名稱欄的話，會跳過標記列、然後把它下面的備註當成資料讀進來。
+      if(!nameVal){
+        const noteRow = r.some(c => c != null && /導入表現/.test(String(c)));
+        if(noteRow) break;
+        continue;
+      }
       if(String(nameVal).includes('導入表現') || String(nameVal).includes('說明')) break;
       const click = r[idx.click];
       const impr = r[idx.impr];
-      if(typeof click !== 'number' || typeof impr !== 'number') continue;
+      // 曝光／點擊不是數字（常見於匯出檔把數字存成文字）→ 整列無法分析。
+      // 以前是靜默跳過，使用者只會發現「筆數對不上」卻不知道原因，所以記錄下來回報。
+      if(typeof click !== 'number' || typeof impr !== 'number'){
+        SKIPPED.push({ name: String(nameVal).slice(0,60), row: i + 1,
+                       click: click==null?'(空白)':String(click).slice(0,20),
+                       impr:  impr==null?'(空白)':String(impr).slice(0,20) });
+        continue;
+      }
 
       const parsed = parseMaterialName(nameVal);
       const _per = parsePeriodToIso(parsed.走期, DATA_YEAR);
@@ -1268,6 +1300,7 @@ const METRICS = {
   cpi:  { label:'CPI',    unit:'元', get:d=>d.cpi==null?null:+d.cpi.toFixed(1),        better:'low',  fmt:v=>'$'+v },
 };
 // 目前資料的轉換欄位名稱（事前預約 / 安裝），用於圖表標題
+let SKIPPED = [];   // 因曝光／點擊非數字而被跳過的列，用於上傳後回報
 let CONV_LABEL = '轉換';
 function convFieldLabel(){ return CONV_LABEL; }
 
@@ -2395,25 +2428,55 @@ document.getElementById('imprThresholdInput').addEventListener('change', ()=>{
 document.getElementById('gasUrlInput').addEventListener('change', saveSettings);
 
 // ── 命名驗證器 ─────────────────────────────────────────
+// 被略過的資料列警示：這是「安靜失敗」，不主動說使用者永遠不會發現
+function skippedBlock(){
+  if(!SKIPPED.length) return '';
+  const rows = SKIPPED.slice(0,10).map(x=>
+    `<li>第 ${x.row} 列　<b>${esc(x.name || '(無名稱)')}</b> — 曝光「${esc(x.impr)}」／點擊「${esc(x.click)}」不是數字</li>`).join('');
+  return `
+    <div class="checkPanel err">
+      🚨 有 <b>${SKIPPED.length}</b> 列未被讀取：曝光或點擊不是數字，這些列已被略過，不會出現在任何分析裡。
+      最常見原因是匯出檔把數字存成「文字格式」（儲存格左上角有綠色三角形）。
+      修法：在 Excel 選取該欄 → 資料 → 資料剖析 → 直接按完成，或把儲存格格式改為「數值」，然後重新上傳。
+      <ul>${rows}${SKIPPED.length>10?`<li>…另有 ${SKIPPED.length-10} 列</li>`:''}</ul>
+    </div>`;
+}
+
 function renderNameCheck(){
   const panel = document.getElementById('nameCheckPanel');
   if(!RAW.length){ panel.innerHTML=''; return; }
   const bad = RAW.filter(d=>!d.命名完整);
   const rate = Math.round((RAW.length - bad.length) / RAW.length * 100);
   if(!bad.length){
-    panel.innerHTML = `<div class="checkPanel ok">✓ 命名檢查通過：${RAW.length} 筆素材全部符合「格式_視覺類型_切角_賣點_走期」五段式命名，配對成功率 100%。</div>`;
+    panel.innerHTML = skippedBlock() +
+      `<div class="checkPanel ok">✓ 命名檢查通過：${RAW.length} 筆素材全部符合「格式_視覺類型_切角_賣點_走期」五段式命名，配對成功率 100%。</div>`;
     return;
   }
   const segNames = ['格式','視覺類型','素材切角','賣點','走期'];
-  const items = bad.slice(0, 12).map(d=>{
-    const missing = segNames.filter(k=>!d[k]).join('、');
-    return `<li><b>${esc(d.素材名稱)}</b> — 缺少：${missing || '段數不足'}</li>`;
-  }).join('');
-  panel.innerHTML = `
+  // 錯位（段數過多／走期不含數字）比單純缺段危險：前 5 段都有值，
+  // 分析照跑但賣點與走期是錯的，所以獨立成一段紅色警示先講。
+  const shifted = bad.filter(d=>d.段數異常 || d.走期可疑);
+  const missing = bad.filter(d=>!(d.段數異常 || d.走期可疑));
+
+  const shiftBlock = shifted.length ? `
+    <div class="checkPanel err">
+      🚨 命名錯位：<b>${shifted.length}</b> 筆素材的名稱被拆成超過五段，或走期段不是日期。
+      這代表某一段裡多打了底線（例：<code>技能_覺醒</code> 應為 <code>技能覺醒</code>），
+      <b>賣點與走期已經錯位</b>——分析仍會執行，但這幾筆的分類是錯的，請修正 Excel 後重新上傳。
+      <ul>${shifted.slice(0,10).map(d=>`<li><b>${esc(d.素材名稱)}</b> — 拆成 ${d.段數} 段｜賣點被讀成「${esc(d.賣點||'')}」、走期被讀成「${esc(d.走期||'')}」</li>`).join('')}
+      ${shifted.length>10?`<li>…另有 ${shifted.length-10} 筆</li>`:''}</ul>
+    </div>` : '';
+
+  const missBlock = missing.length ? `
     <div class="checkPanel warn">
-      ⚠ 命名檢查：${RAW.length} 筆中有 <b>${bad.length}</b> 筆不符合五段式命名（配對成功率 ${rate}%）。缺漏欄位會導致該素材在切角／賣點／走期分析中被歸入「未分類」，數據將失真。
-      <ul>${items}${bad.length>12?`<li>…另有 ${bad.length-12} 筆，請於明細表檢視</li>`:''}</ul>
-    </div>`;
+      ⚠ 命名不完整：${RAW.length} 筆中有 <b>${missing.length}</b> 筆未滿五段（整體配對成功率 ${rate}%）。缺漏欄位會使該素材在切角／賣點／走期分析中被歸入「未分類」。
+      <ul>${missing.slice(0,12).map(d=>{
+        const miss = segNames.filter(k=>!d[k]).join('、');
+        return `<li><b>${esc(d.素材名稱)}</b> — 缺少：${miss || '段數不足'}</li>`;
+      }).join('')}${missing.length>12?`<li>…另有 ${missing.length-12} 筆，請於明細表檢視</li>`:''}</ul>
+    </div>` : '';
+
+  panel.innerHTML = skippedBlock() + shiftBlock + missBlock;
 }
 
 // ── 歷史庫與備份 ───────────────────────────────────────

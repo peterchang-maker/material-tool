@@ -261,7 +261,6 @@
   .metricBtn.on{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600;}
   #angleTable td, #spTable td{white-space:nowrap;}
   .numCell{text-align:right; font-variant-numeric:tabular-nums;}
-  .gsheetRow{display:flex; align-items:center; gap:12px; margin:10px 0;}
   .restoreHint{font-size:12px; color:var(--teal); background:var(--teal-bg); border-radius:8px; padding:8px 12px; margin:0 0 12px;}
   .apifySub{border-top:1px solid var(--border); padding-top:10px; margin-top:10px;}
   .apifySubT{font-size:12.5px; font-weight:600; margin:0 0 8px;}
@@ -333,21 +332,102 @@
   .cmpTable tr.diff td{background:var(--amber-bg);}
   .cmpTable img{width:88px; height:88px; object-fit:cover; border-radius:8px;}
 </style>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style id="v3Skin">
+:root{
+  --bg:#f4f6f9; --surface:#ffffff; --border:#e2e7ef; --border-strong:#c6cfdd;
+  --text:#182338; --text-secondary:#66738c; --text-muted:#98a3b8;
+  --teal:#2456c9; --teal-bg:#e8effc; --coral:#c94f2e; --coral-bg:#faeae4;
+  --amber:#8a6116; --amber-bg:#faf0da; --accent:#2456c9; --gold:#8a6116; --radius:9px;
+  --side:#16233a; --sideText:#c9d4e6;
+}
+body{padding:0; background:var(--bg); font-family:"Noto Sans TC",-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;}
+a{color:var(--accent);} a:hover{color:#183e93;}
+.appShell{display:flex; min-height:100vh;}
+.v3side{position:fixed; left:0; top:0; bottom:0; width:204px; background:var(--side); color:var(--sideText); display:flex; flex-direction:column; z-index:90;}
+.v3brand{padding:18px 18px 15px; border-bottom:1px solid rgba(255,255,255,.08);}
+.v3brand .t{font-size:14px; font-weight:700; color:#fff; letter-spacing:.02em;}
+.v3brand .t i{color:#5b8def; font-style:normal;}
+.v3brand .s{font-size:10px; color:rgba(201,212,230,.5); margin-top:2px;}
+.v3nav{padding:12px 10px; display:flex; flex-direction:column; gap:2px; overflow-y:auto;}
+.v3navGroup{font-size:9.5px; letter-spacing:.14em; color:rgba(201,212,230,.4); padding:12px 10px 5px;}
+.v3nav button[data-nav]{display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:8px 12px; border:none; border-radius:6px; background:transparent; color:rgba(201,212,230,.78); font-size:12.5px; cursor:pointer; font-family:inherit; transition:background .12s;}
+.v3nav button[data-nav]:hover{background:rgba(255,255,255,.07); color:#fff;}
+.v3nav button[data-nav].on{background:var(--accent); color:#fff; font-weight:500;}
+.v3sideFoot{margin-top:auto; padding:13px 18px; font-size:10.5px; color:rgba(201,212,230,.45); border-top:1px solid rgba(255,255,255,.08); line-height:1.7;}
+.v3sideFoot a{color:#7ea6f5; cursor:pointer; text-decoration:none;}
+.appMain{flex:1; min-width:0; margin-left:204px; display:flex; flex-direction:column;}
+.v3top{position:sticky; top:0; z-index:80; display:flex; align-items:center; gap:12px; padding:11px 26px; background:var(--surface); border-bottom:1px solid var(--border); min-height:54px;}
+.v3top .pt{font-size:15px; font-weight:700; color:var(--text);}
+.v3chip{display:none; align-items:center; gap:7px; font-size:11.5px; color:var(--text-secondary); background:var(--bg); border:1px solid var(--border); border-radius:20px; padding:3px 12px; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.v3chip::before{content:""; width:6px; height:6px; border-radius:50%; background:#1e9e6a; flex:none;}
+.v3upBtn{margin-left:auto; height:32px; border:none; border-radius:7px; background:var(--accent); color:#fff; padding:0 15px; font-size:12.5px; font-weight:500; cursor:pointer; font-family:inherit;}
+.v3upBtn:hover{background:#1c46a8;}
+.wrap{max-width:1200px; width:100%; margin:0; padding:22px 26px 70px;}
+.v3page{display:none;} .v3page.on{display:block;}
+/* landing */
+.uploadBox{padding:46px 28px; border-width:1.5px; border-radius:14px;}
+.uploadBox:hover,.uploadBox.drag{border-color:var(--accent);}
+.uploadBox.drag{background:var(--teal-bg);}
+.uploadBox .main{font-size:15px; font-weight:700;}
+/* cards & sections */
+section{border-radius:12px; box-shadow:0 1px 2px rgba(22,35,58,.04);}
+.card,.kpiCard{box-shadow:0 1px 2px rgba(22,35,58,.04);}
+.card .value{font-variant-numeric:tabular-nums;}
+.kpiCard .v{font-variant-numeric:tabular-nums;}
+.kpiCard.hi{background:#eef4ff; border-color:var(--accent);}
+.kpiCard.hi .v{color:var(--accent);}
+.primaryBtn{background:var(--accent); border-color:var(--accent); border-radius:7px;}
+.primaryBtn:hover:not(:disabled){background:#1c46a8;}
+.metricBtn.on{background:var(--accent); border-color:var(--accent);}
+.chipBtn.on{background:var(--accent); border-color:var(--accent);}
+.chipBtn:hover{border-color:var(--accent); color:var(--accent);}
+.ghostBtn{border-radius:7px;}
+.ghostBtn:hover{background:#f0f4fb; border-color:var(--accent); color:var(--accent);}
+th{font-size:11.5px;}
+tbody tr:hover{background:#f4f7fd;}
+.insight{border-radius:0 9px 9px 0;}
+.dsBar,.cnRow.mine .cnBar,.moBar{background:#5b8def;}
+.svBox{border-color:#bcd0f2; background:#eef4ff;}
+.cnBox{border-top-color:#bcd0f2;}
+.nwBox{border-color:#bcd0f2; background:#eef4ff;}
+.nwSecHead{background:#e8effc;}
+.aiSummary,.restoreHint{border-radius:9px;}
+.apiPanel{background:linear-gradient(180deg,#f7faff,var(--surface));}
+section h2.collHead:hover{color:var(--accent);}
+.listHead:hover{border-color:var(--accent);}
+.collAllBar button:hover{border-color:var(--accent); color:var(--accent);}
+.imgUpload:hover,.imgUpload.drag{border-color:var(--accent);}
+.imgUpload.drag{background:var(--teal-bg);}
+@media(max-width:900px){.v3side{display:none;} .appMain{margin-left:0;}}
+</style>
 </head>
 <body>
+<div class="appShell">
+<aside class="v3side">
+  <div class="v3brand"><div class="t">MATERIAL<i>·</i>LAB</div><div class="s">天堂M 素材成效分析 v3.0</div></div>
+  <nav class="v3nav">
+    <div class="v3navGroup">分析</div>
+    <button data-nav="overview">總覽</button>
+    <button data-nav="angles">切角 × 賣點</button>
+    <button data-nav="detail">素材明細</button>
+    <button data-nav="ai">AI 視覺標籤</button>
+    <div class="v3navGroup">市場</div>
+    <button data-nav="market">競品對比</button>
+    <div class="v3navGroup">資料</div>
+    <button data-nav="history">歷史與備份</button>
+  </nav>
+  <div class="v3sideFoot">資料存於本機瀏覽器<br><a data-goto="history">前往備份 →</a></div>
+</aside>
+<div class="appMain">
+<header class="v3top"><span class="pt" id="v3PageTitle">總覽</span><span class="v3chip" id="v3FileChip"></span><button class="v3upBtn" id="v3UploadBtn">⇪ 上傳新檔</button></header>
 <div class="wrap">
-  <h1>天堂M 素材成效分析工具 <span style="font-size:12px; color:var(--text-muted); font-weight:400;">v2.5</span></h1>
-  <p class="sub">上傳「素材分析」格式的 Excel，自動拆解素材特徵並產出成效洞察。v2.5：AI 視覺標籤、七項指標交叉分析、競品自驗證與維度共同性排行、下一波素材建議、Gemini 用量監控。</p>
 
+<div class="v3page" data-page="overview">
   <div class="uploadBox" id="uploadBox">
     <p class="main">點擊或拖曳 Excel 檔案到這裡（.xlsx）</p>
     <p class="hint">需包含欄位：各渠道名稱／素材名稱／費用／預約次數／CPA／點擊／CTR／曝光／CPM</p>
     <input type="file" id="fileInput" accept=".xlsx,.xls">
-  </div>
-
-  <div class="gsheetRow" id="gsheetRow">
-    <button class="ghostBtn" id="gsheetLoadBtn">☁ 從 Google Sheet 讀取</button>
-    <span class="progressText" id="gsheetHint" style="margin-top:0;"></span>
   </div>
 
   <div class="fileBar" id="fileBar" style="display:none;">
@@ -364,7 +444,9 @@
   <div id="nameCheckPanel"></div>
 
   <p id="restoreHint" class="restoreHint" style="display:none;"></p>
+</div>
   <div id="dashboard">
+<div class="v3page" data-page="overview">
     <div class="cards" id="summaryCards"></div>
 
     <div id="aiReportWrap" style="display:none; margin-bottom:18px;"></div>
@@ -416,6 +498,8 @@
       <div class="kpiGrid" id="kpiGrid"></div>
     </section>
 
+</div>
+<div class="v3page" data-page="angles">
     <section>
       <h2>依素材切角彙總成效</h2>
       <p class="sub" style="margin:-6px 0 8px;">點下方指標可切換圖表：CTR、CPA、CPM、CPC、轉換數、CVR、花費</p>
@@ -452,6 +536,8 @@
       </div>
     </section>
 
+</div>
+<div class="v3page" data-page="detail">
     <section>
       <h2>素材明細</h2>
       <div class="controls">
@@ -481,6 +567,8 @@
     </section>
 
 
+</div>
+<div class="v3page" data-page="ai">
     <section>
       <h2>AI 視覺特徵分析（透過 Gemini）</h2>
 
@@ -582,6 +670,8 @@
     </section>
 
 
+</div>
+<div class="v3page" data-page="market">
     <section>
       <h2>市場素材庫（競品對比）</h2>
       <p class="sub" style="margin:0 0 12px;">上傳市場上其他遊戲的廣告素材（來源：Meta 廣告檔案庫、Google 透明度中心、AppGrowing 等），以同一套 18 維標準分析，與我方素材做特徵分佈對比。資料永久保存於本瀏覽器，備份時一併匯出。</p>
@@ -779,6 +869,8 @@
     </section>
 
 
+</div>
+<div class="v3page" data-page="history">
     <section>
       <h2>歷史庫與資料備份</h2>
       <p class="sub" style="margin:0 0 12px;">分析結果存在這台瀏覽器的 localStorage。請定期匯出 JSON 備份——換電腦、清快取都會遺失資料。也可設定 Google Apps Script 端點，把歷史庫同步到共用試算表。</p>
@@ -796,7 +888,10 @@
       </div>
       <div id="historyList"><p class="empty">尚無歷史紀錄。完成分析後點上方「儲存本次分析到歷史庫」。</p></div>
     </section>
+</div>
   </div>
+</div>
+</div>
 </div>
 
 <!-- 週報圖卡模板（隱藏，匯出時渲染） -->
@@ -892,66 +987,13 @@ function handleFile(file){
   reader.readAsArrayBuffer(file);
 }
 
-// ── 從 Google Sheet 讀取（透過 GAS materialSheets 端點）──
-// 分頁名可每次不同，GAS 自動掃描可解析分頁，工具端列成下拉選單
-let gsheetData = null;   // { sheets:[{name,mode,rows}], activeSheet, rowsByName:{} }
-async function loadFromGSheet(sheetName){
-  const url = (lsGet(LS.settings, {}).gasUrl || '').trim();
-  const hint = document.getElementById('gsheetHint');
-  if(!url){
-    hint.textContent = '請先到下方「歷史庫與資料備份」填入 Google Apps Script 網址';
-    hint.style.color = 'var(--coral)';
-    return;
-  }
-  hint.style.color = 'var(--text-secondary)';
-  hint.textContent = '讀取中…';
-  try{
-    const q = url + (url.includes('?')?'&':'?') + 'action=materialSheets'
-      + (sheetName ? '&sheet=' + encodeURIComponent(sheetName) : '');
-    const ctrl = new AbortController();
-    const timer = setTimeout(()=>ctrl.abort(), 30000);
-    const res = await fetch(q, { signal: ctrl.signal });
-    clearTimeout(timer);
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-    const json = await res.json();
-    if(!json.ok) throw new Error(json.error || '讀取失敗');
-    if(!json.sheets || !json.sheets.length) throw new Error('試算表中找不到可解析的素材分頁');
-    if(!Array.isArray(json.data)) throw new Error('回傳資料格式不符');
-
-    // 用回傳的 aoa 建一個記憶體 workbook，交給既有 parseSheet 流程
-    const active = json.activeSheet;
-    const ws = XLSX.utils.aoa_to_sheet(json.data);
-    const wb = { SheetNames:[active], Sheets:{ [active]: ws } };
-    workbook = wb;
-    rawBuffer = null;   // 線上讀取無原始 buffer（Excel 內嵌圖擷取不適用，改用市場素材庫或手動上傳圖）
-
-    // 下拉選單列出所有可解析分頁（含目前這個），供切換
-    gsheetData = json;
-    const names = json.sheets.map(s=>s.name);
-    sheetSelect.innerHTML = names.map(n=>`<option ${n===active?'selected':''}>${esc(n)}</option>`).join('');
-    sheetRow.style.display = 'flex';
-    fileName.textContent = '☁ Google Sheet · ' + active;
-    uploadBox.style.display = 'none';
-    fileBar.style.display = 'flex';
-
-    parseSheet(active);
-    const other = json.sheets.length - 1;
-    hint.textContent = `✓ 已讀取「${active}」`
-      + (other>0 ? `，另有 ${other} 個分頁可從上方切換` : '')
-      + '。Excel 內嵌圖片擷取不適用線上讀取，素材圖請用市場素材庫或手動上傳。';
-  }catch(e){
-    hint.style.color = 'var(--coral)';
-    hint.textContent = e.name==='AbortError' ? '讀取逾時，請確認網路與 GAS 部署狀態' : ('讀取失敗：' + e.message);
-  }
-}
-document.getElementById('gsheetLoadBtn').addEventListener('click', ()=>loadFromGSheet());
-// 統一的分頁切換：線上來源走 GAS 重新讀取，本地檔案走 parseSheet
+// ── Google Sheet 線上讀取已移除（v3.0.1）──
+// gsheetData 保留宣告：sheetSelect 切換與 reset 邏輯仍有參照，恆為 null 即走本地檔案流程
+let gsheetData = null;
+// 分頁切換（v3.0.1：加入 workbook 防護，reset 後不觸發解析）
 sheetSelect.addEventListener('change', ()=>{
-  if(gsheetData && fileName.textContent.startsWith('☁')){
-    loadFromGSheet(sheetSelect.value);
-  }else{
-    parseSheet(sheetSelect.value);
-  }
+  if(!workbook || !sheetSelect.value) return;
+  parseSheet(sheetSelect.value);
 });
 
 function cleanMoney(x){
@@ -5359,6 +5401,41 @@ function setAllCollapsed(flag){
     });
   }
 }
+</script>
+<script>
+(function(){
+  var pages = Array.prototype.slice.call(document.querySelectorAll('.v3page'));
+  var btns = Array.prototype.slice.call(document.querySelectorAll('[data-nav]'));
+  var titles = {overview:'總覽', angles:'切角 × 賣點', detail:'素材明細', ai:'AI 視覺標籤', market:'競品對比', history:'歷史與備份'};
+  function go(p){
+    if(!titles[p]) p = 'overview';
+    pages.forEach(function(el){ el.classList.toggle('on', el.getAttribute('data-page') === p); });
+    btns.forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-nav') === p); });
+    document.getElementById('v3PageTitle').textContent = titles[p];
+    try{ localStorage.setItem('mt_v3_page', p); }catch(e){}
+    window.scrollTo(0, 0);
+    setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 60); // 讓隱藏分頁裡的 Chart.js 重新量尺寸
+  }
+  btns.forEach(function(b){ b.addEventListener('click', function(){ go(b.getAttribute('data-nav')); }); });
+  document.querySelectorAll('[data-goto]').forEach(function(a){ a.addEventListener('click', function(){ go(a.getAttribute('data-goto')); }); });
+  var saved = null; try{ saved = localStorage.getItem('mt_v3_page'); }catch(e){}
+  go(saved || 'overview');
+  var chip = document.getElementById('v3FileChip');
+  var fn = document.getElementById('fileName');
+  function syncChip(){
+    var t = (fn.textContent || '').trim();
+    chip.style.display = t ? 'inline-flex' : 'none';
+    chip.textContent = t;
+  }
+  new MutationObserver(syncChip).observe(fn, {childList:true, characterData:true, subtree:true});
+  syncChip();
+  document.getElementById('v3UploadBtn').addEventListener('click', function(){
+    go('overview');
+    var ub = document.getElementById('uploadBox');
+    if(ub && ub.style.display !== 'none'){ document.getElementById('fileInput').click(); }
+    else { var r = document.getElementById('resetBtn'); if(r) r.click(); }
+  });
+})();
 </script>
 </body>
 </html>

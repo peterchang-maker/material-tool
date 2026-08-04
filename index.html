@@ -439,13 +439,19 @@ section h2.collHead:hover{color:var(--accent);}
 /* 改善建議診斷表：長標籤字串原本不換行，會把整張表撐爆 */
 #ivDiag table{table-layout:fixed; width:100%; min-width:920px;}
 #ivDiag th,#ivDiag td{vertical-align:top; white-space:normal;}
-#ivDiag col.ivName{width:34%;} #ivDiag col.ivDx{width:88px;}
-#ivDiag col.ivNum{width:74px;} #ivDiag col.ivFix{width:20%;}
+#ivDiag col.ivName{width:24%;} #ivDiag col.ivDx{width:84px;}
+#ivDiag col.ivNum{width:70px;} #ivDiag col.ivFix{width:30%;}
 #ivDiag .ivName{font-size:12.5px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; text-wrap:pretty;}
 #ivDiag .ivTags{display:flex; flex-wrap:wrap; gap:3px; margin-top:5px;}
 #ivDiag .ivTags span{font-size:10.5px; line-height:1.4; padding:1px 5px; background:var(--bg); border:1px solid var(--border); color:var(--text-secondary); max-width:100%; overflow-wrap:anywhere;}
 #ivDiag td.numCell{white-space:nowrap; font-size:12px;}
-#ivDiag .ivFix{font-size:11.5px; line-height:1.55; color:var(--text-secondary); overflow-wrap:anywhere;}
+#ivDiag .ivFix{font-size:11.5px; line-height:1.6; color:var(--text); overflow-wrap:anywhere;}
+#ivDiag .ivFix li{list-style:none; display:flex; gap:5px; margin-bottom:5px;}
+#ivDiag .ivFix li:last-child{margin-bottom:0;}
+#ivDiag .ivFix li::before{content:"→"; flex:none; color:var(--accent); font-weight:700;}
+#ivDiag .ivFix ul{margin:0; padding:0;}
+#ivDiag .ivFix .ev{color:var(--text-muted); font-size:10.5px;}
+#ivDiag .ivFix .gen{color:var(--text-secondary);}
 #ivDiag .tag{white-space:nowrap;}
 /* 總覽重點面板 */
 .heroPanel{background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 1px 2px rgba(22,35,58,.04); margin-bottom:20px; overflow:hidden;}
@@ -4813,6 +4819,71 @@ var IV_TYPES = {
   thin:   { label:'樣本不足', tag:'tag-neutral', fix:'曝光低於警示門檻，先加曝光再判斷，勿急著改' },
   mid:    { label:'中段表現', tag:'tag-neutral', fix:'各項指標接近基準，可小幅測試單一變因' }
 };
+// 依維度算出「本批表現最好的值」，作為改法的實證依據
+// lowerBetter 的指標(CPA)用最小值、CTR 用最大值；樣本不足的值不列入
+function ivWinners(rows, thr){
+  var byDim = {};
+  rows.forEach(function(r){
+    if(!r.tagArr) return;
+    r.tagArr.forEach(function(pair){
+      var i = pair.indexOf('=');
+      if(i < 0) return;
+      var dim = pair.slice(0, i), val = pair.slice(i + 1);
+      if(!val || /無人物|^無$/.test(val)) return;
+      byDim[dim] = byDim[dim] || {};
+      (byDim[dim][val] = byDim[dim][val] || []).push(r);
+    });
+  });
+  var win = {};
+  Object.keys(byDim).forEach(function(dim){
+    var stats = Object.keys(byDim[dim]).map(function(val){
+      var list = byDim[dim][val].map(function(x){ return x.src; });
+      var a = ivAgg(list);
+      return { val: val, n: list.length, ctr: a.ctr, cpa: a.cpa, impr: a.impr };
+    }).filter(function(s){ return s.impr >= thr; });
+    if(stats.length < 2) return;
+    var all = ivAgg(rows.map(function(x){ return x.src; }));
+    // 至少 2 支才算得上實證；CTR 最佳但 CPA 明顯偏貴的值不推薦（那是吸睛不轉換）
+    var solid = stats.filter(function(s){
+      return s.n >= 2 && !(s.cpa != null && all.cpa && s.cpa > all.cpa * 1.2);
+    });
+    if(!solid.length) return;
+    var bestCtr = solid.slice().sort(function(x, y){ return (y.ctr || 0) - (x.ctr || 0); })[0];
+    var withCpa = solid.filter(function(s){ return s.cpa != null && isFinite(s.cpa); });
+    var bestCpa = withCpa.length > 1 ? withCpa.slice().sort(function(x, y){ return x.cpa - y.cpa; })[0] : null;
+    win[dim] = { byCtr: bestCtr, byCpa: bestCpa, all: stats };
+  });
+  return win;
+}
+// 素材製作端的具體改法：把診斷型態對應到「動哪個視覺元素、怎麼動」
+var IV_CRAFT = {
+  hook: [
+    { dim:'構圖密度', match:/低留白|密集/, fix:'畫面元素砍掉三成、留白拉高，主標字級放大 1.5 倍——密集畫面在動態牆上第一眼讀不到重點' },
+    { dim:'是否有數字或倒數', match:/^無/, fix:'標題加上具體數字（獎勵數量、倒數天數），數字字級要比其他文字大一級' },
+    { dim:'人物大小占比', match:/全身|小|遠景/, fix:'人物裁到半身以上、占畫面 40% 以上，臉部要看得清楚' },
+    { dim:'CTA明確度', match:/不明確|無/, fix:'加上明確 CTA 文字（例：立即預約領獎），字級不小於主標的 60%' },
+    { dim:'表情情緒', match:/嚴肅|冷峻|無表情/, fix:'表情改成有情緒張力的（驚訝、興奮），冷臉在小尺寸縮圖裡沒有辨識度' }
+  ],
+  convert: [
+    { dim:'是否有數字或倒數', match:/有/, fix:'數字改成「實際可領到什麼」而非誇大總值，避免點進來發現落差' },
+    { dim:'CTA明確度', match:/明確/, fix:'CTA 文字改成與落地頁一致的動作（預約 vs 下載要對得上），減少期待落差' },
+    { dim:'人物類型', match:/真人實拍/, fix:'改用遊戲實機畫面或遊戲內立繪，真人實拍容易吸到非玩家客群' },
+    { dim:'主色系', match:/./, fix:'素材承諾的內容要與遊戲實際畫面一致，把實機截圖放進畫面下半部當佐證' }
+  ],
+  deliver: [
+    { dim:'版面配置', match:/./, fix:'補齊各版位尺寸（1:1／4:5／9:16），單一比例會被系統限縮到高價版位' },
+    { dim:'構圖密度', match:/低留白|密集/, fix:'文字移出畫面邊緣 20% 安全區，避免版位裁切後被判低品質' }
+  ],
+  mid: [
+    { dim:'人物大小占比', match:/./, fix:'一次只改一個變因（先改人物占比，其餘不動），才看得出是什麼在起作用' }
+  ],
+  keep: [
+    { dim:'./', match:/./, fix:'不要動這支，改做 2-3 支變體：只換主標文案與背景色，其餘元素完全沿用' }
+  ],
+  thin: [
+    { dim:'./', match:/./, fix:'先把預算加到跨過樣本門檻再判斷，現在改動等於憑雜訊做決定' }
+  ]
+};
 function buildImproveList(){
   var tagged = uploadedImages.filter(function(i){ return i.matchedRow; });
   if(tagged.length < 3) return { err:'需要至少 3 支已對上成效資料的素材，目前 ' + tagged.length + ' 支。請先上傳 Excel 並在「AI 視覺標籤」頁上傳對應素材圖。' };
@@ -4830,7 +4901,53 @@ function buildImproveList(){
     else if(base.cpm && a.cpm != null && a.cpm > base.cpm * 1.3) type = 'deliver';
     else type = 'mid';
     var tagArr = t ? dims.map(function(d){ return t[d] ? d + '=' + t[d] : null; }).filter(Boolean) : [];
-    return { name: i.name, a: a, type: type, tags: tagArr.join('｜'), tagArr: tagArr, hasTags: !!t };
+    return { name: i.name, src: i, a: a, type: type, tags: tagArr.join('｜'), tagArr: tagArr, hasTags: !!t };
+  });
+  // 依實證 + 製作端規則，寫出這一支該動什麼
+  var thrW = thr;
+  var winners = ivWinners(rows, Math.max(1, Math.round(thrW / 2)));
+  rows.forEach(function(r){
+    var out = [];
+    var lowerBetter = (r.type === 'convert');
+    var swappable = (r.type !== 'keep' && r.type !== 'thin');
+    if(swappable && r.tagArr && r.tagArr.length){
+      // ① 實證型：本批同維度有明顯更好的值，就指名改過去
+      r.tagArr.forEach(function(pair){
+        if(out.length >= 2) return;
+        var i = pair.indexOf('='); if(i < 0) return;
+        var dim = pair.slice(0, i), val = pair.slice(i + 1);
+        var w = winners[dim]; if(!w) return;
+        var best = lowerBetter ? (w.byCpa || w.byCtr) : w.byCtr;
+        if(!best || best.val === val) return;
+        var mine = w.all.filter(function(s){ return s.val === val; })[0];
+        if(!mine) return;
+        var ev;
+        if(lowerBetter && best.cpa != null && mine.cpa != null){
+          if(!(best.cpa < mine.cpa * 0.85)) return;
+          ev = 'CPA $' + Math.round(best.cpa).toLocaleString() + ' vs 目前 $' + Math.round(mine.cpa).toLocaleString();
+        }else{
+          if(!(best.ctr > (mine.ctr || 0) * 1.15)) return;
+          ev = 'CTR ' + (best.ctr * 100).toFixed(2) + '% vs 目前 ' + ((mine.ctr || 0) * 100).toFixed(2) + '%';
+        }
+        out.push({ t: dim + ' 從「' + val + '」改成「' + best.val + '」', ev: '本批實證：' + ev + '（' + best.n + ' 支）' });
+      });
+    }
+    if(r.tagArr && r.tagArr.length){
+      // ② 製作端規則：對照這支的標籤值給具體動作
+      (IV_CRAFT[r.type] || []).forEach(function(rule){
+        if(out.length >= 3) return;
+        var hit = r.tagArr.some(function(pair){
+          var i = pair.indexOf('=');
+          return i > 0 && pair.slice(0, i) === rule.dim && rule.match.test(pair.slice(i + 1));
+        });
+        if(rule.dim === './' || hit) out.push({ t: rule.fix });
+      });
+    }
+    if(!out.length){
+      out.push({ t: IV_TYPES[r.type].fix, gen: true });
+      if(!r.hasTags) out.push({ t: '這支尚無視覺標籤，跑完 AI 標籤才能指到具體元素', gen: true });
+    }
+    r.fixes = out;
   });
   rows.sort(function(x, y){
     var rank = { convert:0, hook:1, deliver:2, mid:3, thin:4, keep:5 };
@@ -4865,14 +4982,17 @@ function renderImproveDiag(){
       + '<td class="numCell">' + pct(r.a.ctr) + '</td><td class="numCell">' + pct(r.a.cvr) + '</td>'
       + '<td class="numCell">' + mny(r.a.cpa) + '</td><td class="numCell">' + mny(r.a.cpm) + '</td>'
       + '<td class="numCell">' + r.a.impr.toLocaleString() + '</td><td class="numCell">' + mny(r.a.cost) + '</td>'
-      + '<td><div class="ivFix">' + esc(T.fix) + '</div></td></tr>';
+      + '<td><div class="ivFix"><ul>' + (r.fixes || []).map(function(f){
+          return '<li><span' + (f.gen ? ' class="gen"' : '') + '>' + esc(f.t)
+            + (f.ev ? '<br><span class="ev">' + esc(f.ev) + '</span>' : '') + '</span></li>';
+        }).join('') + '</ul></div></td></tr>';
   }).join('');
   box.innerHTML = head + '<div class="table-scroll"><table>'
     + '<colgroup><col class="ivName"><col class="ivDx"><col class="ivNum"><col class="ivNum">'
     + '<col class="ivNum"><col class="ivNum"><col class="ivNum"><col class="ivNum"><col class="ivFix"></colgroup>'
     + '<thead><tr><th>素材</th><th>診斷</th>'
     + '<th class="numCell">CTR</th><th class="numCell">CVR</th><th class="numCell">CPA</th><th class="numCell">CPM</th>'
-    + '<th class="numCell">曝光</th><th class="numCell">花費</th><th>優先處理方向</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+    + '<th class="numCell">曝光</th><th class="numCell">花費</th><th>建議怎麼改</th></tr></thead><tbody>' + body + '</tbody></table></div>';
 }
 window.__renderImproveDiag = renderImproveDiag;
 
@@ -4896,7 +5016,8 @@ document.getElementById('improveBtn').addEventListener('click', async function()
       + '｜CTR ' + pct(a.ctr) + '｜CPC ' + mny(a.cpc) + '｜CPM ' + mny(a.cpm)
       + '｜CVR ' + pct(a.cvr) + '｜CPA ' + mny(a.cpa)
       + '｜曝光 ' + a.impr.toLocaleString() + '｜花費 ' + mny(a.cost)
-      + (r.tags ? '｜視覺標籤：' + r.tags : '｜（尚無視覺標籤）');
+      + (r.tags ? '｜視覺標籤：' + r.tags : '｜（尚無視覺標籤）')
+      + ((r.fixes && r.fixes.length) ? '\n    工具已提出的改法：' + r.fixes.map(function(f){ return f.t + (f.ev ? '（' + f.ev + '）' : ''); }).join('；') : '');
   }).join('\n');
   var keep = d.rows.filter(function(r){ return r.type === 'keep'; }).map(function(r){
     return '- ' + r.name + '｜CTR ' + pct(r.a.ctr) + '｜CPA ' + mny(r.a.cpa) + (r.tags ? '｜' + r.tags : '');
@@ -4915,6 +5036,7 @@ document.getElementById('improveBtn').addEventListener('click', async function()
       + '- 低樣本警示門檻：曝光 ' + d.thr.toLocaleString() + ' 以下的素材樣本不足，不應據此下改動決策\n\n'
       + '═══ 需要改善的素材（' + pick.length + ' 支，已附工具的規則診斷）═══\n' + lines + '\n\n'
       + '═══ 表現優於基準的素材（可作為改動時的參考母本）═══\n' + (keep || '（本批沒有明顯優於基準的素材）') + '\n\n'
+      + '每支素材下方「工具已提出的改法」是規則引擎依本批實證算出的，請延伸細化成可執行規格，不要與它矛盾；若你認為它判斷有誤，請明確說明理由。\n\n'
       + '診斷詞義：不夠吸睛=CTR 低於基準八成；吸睛不轉換=CTR 尚可但 CPA 高於基準兩成以上；'
       + '投遞成本高=CPM 高於基準三成以上；中段表現=各項接近基準；樣本不足=曝光低於門檻。\n\n'
       + (extra ? '═══ 補充限制與脈絡 ═══\n' + extra + '\n\n' : '')

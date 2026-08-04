@@ -420,6 +420,36 @@ section h2.collHead:hover{color:var(--accent);}
 .imgUpload.drag{background:var(--teal-bg);}
 @media(max-width:900px){.v3side{display:none;} .appMain{margin-left:0;}}
 </style>
+<style id="v4Extra">
+/* 全域篩選列:跨頁常駐,任何分頁都看得到目前的資料範圍 */
+.gfBar{position:sticky; top:54px; z-index:70; background:var(--surface); border-bottom:1px solid var(--border); padding:8px 26px;}
+.gfHead{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+.gfLabel{font-size:10px; font-weight:700; letter-spacing:.12em; color:var(--text-muted);}
+.gfState{font-size:12px; color:var(--text); display:flex; gap:8px; flex-wrap:wrap; font-variant-numeric:tabular-nums;}
+.gfState b{font-weight:700; color:var(--accent);}
+.gfState span{border-left:1px solid var(--border-strong); padding-left:8px;}
+.gfState span:first-child{border-left:none; padding-left:0;}
+.gfToggle{margin-left:auto; height:28px; padding:0 12px; border:1px solid var(--border-strong); border-radius:7px; background:var(--surface); font-size:12px; cursor:pointer; font-family:inherit; color:var(--text);}
+.gfToggle:hover{border-color:var(--accent); color:var(--accent); background:#f0f4fb;}
+.gfBody{display:none; padding-top:10px; margin-top:8px; border-top:1px solid var(--border);}
+.gfBar.open .gfBody{display:block;}
+.gfBody .dateBar{margin-bottom:10px;}
+.gfBody .sheetRow{margin-bottom:8px;}
+.gfThr{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-secondary);}
+/* 總覽重點面板 */
+.heroPanel{background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 1px 2px rgba(22,35,58,.04); margin-bottom:20px; overflow:hidden;}
+.heroTop{display:grid; grid-template-columns:1.6fr 1fr;}
+.heroLead{padding:18px 20px; border-right:1px solid var(--border);}
+.heroKicker{font-size:10.5px; font-weight:700; letter-spacing:.14em; color:var(--accent); margin:0 0 7px;}
+.heroHead{font-size:19px; font-weight:700; line-height:1.35; letter-spacing:-.01em; margin:0 0 9px; text-wrap:pretty;}
+.heroHead em{font-style:normal; color:var(--accent);}
+.heroSub{font-size:12.5px; line-height:1.7; color:var(--text-secondary); margin:0; font-variant-numeric:tabular-nums;}
+.heroActs{padding:18px 20px; background:#f7faff;}
+.heroActs ol{margin:7px 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px;}
+.heroActs li{display:flex; gap:9px; font-size:12px; line-height:1.6; align-items:flex-start; color:var(--text);}
+.heroActs li b{flex:none; width:17px; height:17px; border-radius:4px; background:var(--teal-bg); color:var(--accent); font-size:10.5px; font-weight:700; display:flex; align-items:center; justify-content:center; margin-top:1px;}
+@media(max-width:820px){.heroTop{grid-template-columns:1fr;} .heroLead{border-right:none; border-bottom:1px solid var(--border);}}
+</style>
 </head>
 <body>
 <div class="appShell">
@@ -471,9 +501,8 @@ section h2.collHead:hover{color:var(--accent);}
     <div id="aiReportWrap" style="display:none; margin-bottom:18px;"></div>
 
     <div class="toolbar">
-      <label>低樣本警示門檻（曝光）：</label>
+      <label style="display:none;">低樣本警示門檻（曝光）：</label>
       <input type="number" id="imprThresholdInput" min="0" step="500" value="3000">
-      <div class="sep"></div>
       <button class="ghostBtn" id="saveHistoryBtn">儲存本次分析到歷史庫</button>
       <button class="ghostBtn" id="exportCardBtn">匯出週報圖卡（PNG）</button>
       <button class="ghostBtn" id="aiReportBtn">⚡ AI 撰寫週報文字</button>
@@ -1811,7 +1840,7 @@ function onDateChange(){
   renderAll();
 }
 
-function renderAll(){
+function renderAll(){ /* 包裝點見頁尾 v4 腳本 */
 
   const channelSet = getContextChannels();
   const byChannel = channelSet.length ? RAW.filter(d=>channelSet.includes(d.渠道)) : RAW;
@@ -1901,6 +1930,7 @@ function renderAll(){
 
   renderTable();
   window.__lastPerfSnapshot = { perfData, avgCTR, totalCost, angleWithScore, spAgg: sortAggBy(SP_AGG,'ctr'), ctxLabel };
+  if(window.__renderHero) try{ window.__renderHero(); }catch(e){}
 }
 
 function renderTable(){
@@ -5512,10 +5542,101 @@ function setAllCollapsed(flag, pageName){
     document.getElementById('v3PageTitle').textContent = titles[p];
     try{ localStorage.setItem('mt_v3_page', p); }catch(e){}
     window.scrollTo(0, 0);
-    setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 60); // 讓隱藏分頁裡的 Chart.js 重新量尺寸
+    // 隱藏分頁裡的 canvas 尺寸為 0,切回來要主動叫 Chart.js 重新量測並重繪
+    setTimeout(function(){
+      window.dispatchEvent(new Event('resize'));
+      try{
+        [angleChartInst, angleCpaChartInst, spChartInst].forEach(function(c){
+          if(c){ c.resize(); c.update('none'); }
+        });
+      }catch(e){}
+    }, 60);
   }
   btns.forEach(function(b){ b.addEventListener('click', function(){ go(b.getAttribute('data-nav')); }); });
   document.querySelectorAll('[data-goto]').forEach(function(a){ a.addEventListener('click', function(){ go(a.getAttribute('data-goto')); }); });
+  // ── 全域篩選列：把影響所有分頁數字的控制項移出總覽頁,改為跨頁常駐 ──
+  var bar = document.createElement('div');
+  bar.className = 'gfBar';
+  bar.innerHTML = '<div class="gfHead"><span class="gfLabel">資料範圍</span><span class="gfState" id="gfState"></span>'
+    + '<button class="gfToggle" id="gfToggle">調整篩選</button></div><div class="gfBody" id="gfBody"></div>';
+  var top = document.querySelector('.v3top');
+  top.parentNode.insertBefore(bar, top.nextSibling);
+  var gfBody = document.getElementById('gfBody');
+  var ctxRow = document.getElementById('contextSelect') ? document.getElementById('contextSelect').closest('.sheetRow') : null;
+  var thrInput = document.getElementById('imprThresholdInput');
+  if(ctxRow) gfBody.appendChild(ctxRow);
+  var dateBar = document.getElementById('dateBar');
+  if(dateBar) gfBody.appendChild(dateBar);
+  var ctxHint = document.getElementById('contextHint');
+  if(ctxHint) gfBody.appendChild(ctxHint);
+  if(thrInput){
+    var thrWrap = document.createElement('div');
+    thrWrap.className = 'gfThr';
+    var lb = document.createElement('label');
+    lb.textContent = '低樣本警示門檻（曝光）：';
+    thrWrap.appendChild(lb); thrWrap.appendChild(thrInput);
+    gfBody.appendChild(thrWrap);
+  }
+  document.getElementById('gfToggle').addEventListener('click', function(){
+    var open = bar.classList.toggle('open');
+    this.textContent = open ? '收起篩選' : '調整篩選';
+  });
+
+  function fmtRange(){
+    var f = document.getElementById('dateFrom'), t = document.getElementById('dateTo');
+    var a = f && f.value, b = t && t.value;
+    return (a || b) ? (a || '不限') + ' ~ ' + (b || '不限') : '全部走期';
+  }
+  function syncState(){
+    var el = document.getElementById('gfState');
+    if(!el) return;
+    var sel = document.getElementById('contextSelect');
+    var ctx = sel && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent.split('（')[0] : '—';
+    var thr = thrInput ? Number(thrInput.value || 0).toLocaleString() : '—';
+    el.innerHTML = '<span><b>' + ctx + '</b></span><span>' + fmtRange() + '</span><span>低樣本 &lt; ' + thr + ' 曝光</span>';
+  }
+  ['contextSelect','dateFrom','dateTo','imprThresholdInput'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el){ el.addEventListener('change', syncState); el.addEventListener('input', syncState); }
+  });
+  bar.addEventListener('click', function(e){ if(e.target.classList.contains('chipBtn')) setTimeout(syncState, 30); });
+  syncState();
+
+  // ── 總覽重點面板：把「該看什麼、該做什麼」放到第一屏 ──
+  var cards = document.getElementById('summaryCards');
+  var hero = document.createElement('div');
+  hero.className = 'heroPanel';
+  hero.style.display = 'none';
+  cards.parentNode.insertBefore(hero, cards);
+  function renderHero(){
+    var s = window.__lastPerfSnapshot;
+    if(!s || !s.angleWithScore || s.angleWithScore.length < 2){ hero.style.display = 'none'; return; }
+    var best = s.angleWithScore[0], worst = s.angleWithScore[s.angleWithScore.length - 1];
+    var thr = thrInput ? Number(thrInput.value || 0) : 0;
+    var lowN = s.perfData.filter(function(d){ return (d.曝光 || 0) < thr; }).length;
+    var topSp = (s.spAgg || [])[0];
+    var acts = [];
+    acts.push('加碼 <b style="all:unset;font-weight:700">' + best.key + '</b> 切角：綜合表現第一,可優先擴大預算與變體數');
+    if(topSp) acts.push('沿用 <b style="all:unset;font-weight:700">' + topSp.key + '</b> 賣點的訴求寫法,套進其他切角測試');
+    acts.push('檢視 <b style="all:unset;font-weight:700">' + worst.key + '</b> 切角：CTR 第' + worst.ctrRank + '、CPA 第' + worst.cpaRank + ',先改前 3 秒或直接汰換');
+    if(lowN) acts.push('留意 ' + lowN + ' 支曝光低於門檻的素材,樣本不足時先別下結論');
+    hero.innerHTML = '<div class="heroTop"><div class="heroLead">'
+      + '<p class="heroKicker">本次分析重點</p>'
+      + '<h2 class="heroHead">最有效的切角是 <em>' + best.key + '</em>,最該處理的是 <em>' + worst.key + '</em></h2>'
+      + '<p class="heroSub">' + s.ctxLabel + '　平均 CTR ' + (s.avgCTR * 100).toFixed(2) + '%　總花費 ' + Math.round(s.totalCost).toLocaleString()
+      + '　共 ' + s.perfData.length + ' 筆納入計算。' + (lowN ? ' 其中 ' + lowN + ' 筆曝光低於警示門檻。' : '') + '</p></div>'
+      + '<div class="heroActs"><p class="heroKicker">下一步該做什麼</p><ol>'
+      + acts.map(function(a, i){ return '<li><b>' + (i + 1) + '</b><span>' + a + '</span></li>'; }).join('')
+      + '</ol></div></div>';
+    hero.style.display = '';
+  }
+  if(typeof window.renderAll === 'function'){
+    var origRenderAll = window.renderAll;
+    window.renderAll = function(){ var r = origRenderAll.apply(this, arguments); try{ renderHero(); syncState(); }catch(e){} return r; };
+  }
+  window.__renderHero = renderHero;
+  renderHero();
+
   var saved = null; try{ saved = localStorage.getItem('mt_v3_page'); }catch(e){}
   go(saved || 'overview');
   var chip = document.getElementById('v3FileChip');

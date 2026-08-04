@@ -443,6 +443,11 @@ section h2.collHead:hover{color:var(--accent);}
 #ivDiag col.ivNum{width:70px;} #ivDiag col.ivFix{width:30%;}
 #ivDiag .ivName{font-size:12.5px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; text-wrap:pretty;}
 #ivDiag .ivTags{display:flex; flex-wrap:wrap; gap:3px; margin-top:5px;}
+#ivDiag.tagsOff .ivTags{display:none;}
+#ivDiag .ivTagCount{display:none; margin-top:4px; font-size:10.5px; color:var(--text-muted);}
+#ivDiag.tagsOff .ivTagCount{display:block;}
+.ivTagsBtn{height:26px; padding:0 10px; border:1px solid var(--border-strong); border-radius:6px; background:var(--surface); font-size:11.5px; color:var(--text-secondary); cursor:pointer; font-family:inherit;}
+.ivTagsBtn:hover{border-color:var(--accent); color:var(--accent);}
 #ivDiag .ivTags span{font-size:10.5px; line-height:1.4; padding:1px 5px; background:var(--bg); border:1px solid var(--border); color:var(--text-secondary); max-width:100%; overflow-wrap:anywhere;}
 #ivDiag td.numCell{white-space:nowrap; font-size:12px;}
 #ivDiag .ivFix{font-size:11.5px; line-height:1.6; color:var(--text); overflow-wrap:anywhere;}
@@ -4968,7 +4973,8 @@ function renderImproveDiag(){
   var chips = Object.keys(IV_TYPES).filter(function(k){ return counts[k]; }).map(function(k){
     return '<span class="tag ' + IV_TYPES[k].tag + '">' + IV_TYPES[k].label + ' ' + counts[k] + '</span>';
   }).join(' ');
-  var head = '<div class="controls" style="margin:0 0 10px; gap:6px;">' + chips + '</div>'
+  var head = '<div class="controls" style="margin:0 0 10px; gap:6px; align-items:center;">' + chips
+    + '<button class="ivTagsBtn" id="ivTagsToggle" style="margin-left:auto;"></button></div>'
     + '<p class="sub" style="margin:0 0 10px; font-size:12px;">基準線（' + d.base.n + ' 支加總）：CTR ' + pct(d.base.ctr)
     + '｜CPC ' + mny(d.base.cpc) + '｜CPM ' + mny(d.base.cpm) + '｜CVR ' + pct(d.base.cvr) + '｜CPA ' + mny(d.base.cpa)
     + '　低樣本門檻 ' + d.thr.toLocaleString() + ' 曝光'
@@ -4976,7 +4982,9 @@ function renderImproveDiag(){
   var body = d.rows.map(function(r){
     var T = IV_TYPES[r.type];
     var chips = r.tagArr && r.tagArr.length
-      ? '<div class="ivTags">' + r.tagArr.map(function(x){ return '<span>' + esc(x) + '</span>'; }).join('') + '</div>' : '';
+      ? '<div class="ivTags">' + r.tagArr.map(function(x){ return '<span>' + esc(x) + '</span>'; }).join('') + '</div>'
+        + '<div class="ivTagCount">' + r.tagArr.length + ' 個視覺標籤</div>'
+      : '';
     return '<tr><td><div class="ivName">' + esc(r.name) + '</div>' + chips + '</td>'
       + '<td><span class="tag ' + T.tag + '">' + T.label + '</span></td>'
       + '<td class="numCell">' + pct(r.a.ctr) + '</td><td class="numCell">' + pct(r.a.cvr) + '</td>'
@@ -4993,6 +5001,20 @@ function renderImproveDiag(){
     + '<thead><tr><th>素材</th><th>診斷</th>'
     + '<th class="numCell">CTR</th><th class="numCell">CVR</th><th class="numCell">CPA</th><th class="numCell">CPM</th>'
     + '<th class="numCell">曝光</th><th class="numCell">花費</th><th>建議怎麼改</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+  var pref = null;
+  try{ pref = localStorage.getItem('mt_iv_tags'); }catch(e){}
+  var showTags = pref === 'on';
+  var tBtn = document.getElementById('ivTagsToggle');
+  function syncTags(){
+    box.classList.toggle('tagsOff', !showTags);
+    if(tBtn) tBtn.textContent = showTags ? '隱藏視覺標籤' : '顯示視覺標籤';
+  }
+  if(tBtn) tBtn.addEventListener('click', function(){
+    showTags = !showTags;
+    try{ localStorage.setItem('mt_iv_tags', showTags ? 'on' : 'off'); }catch(e){}
+    syncTags();
+  });
+  syncTags();
 }
 window.__renderImproveDiag = renderImproveDiag;
 

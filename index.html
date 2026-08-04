@@ -436,12 +436,24 @@ section h2.collHead:hover{color:var(--accent);}
 .gfBody .dateBar{margin-bottom:10px;}
 .gfBody .sheetRow{margin-bottom:8px;}
 .gfThr{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-secondary);}
-/* 改善建議診斷表：長標籤字串原本不換行，會把整張表撐爆 */
-#ivDiag table{table-layout:fixed; width:100%; min-width:920px;}
-#ivDiag th,#ivDiag td{vertical-align:top; white-space:normal;}
-#ivDiag col.ivName{width:24%;} #ivDiag col.ivDx{width:84px;}
-#ivDiag col.ivNum{width:70px;} #ivDiag col.ivFix{width:30%;}
-#ivDiag .ivName{font-size:12.5px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; text-wrap:pretty;}
+/* 改善建議：改用卡片清單，欄位過窄會截斷內容、也不該出現欄內捲軸 */
+.ivCards{display:flex; flex-direction:column; gap:10px;}
+.ivCard{border:1px solid var(--border); border-radius:10px; background:var(--card,#fff); overflow:hidden;}
+.ivCard.pri{border-left:4px solid var(--coral);}
+.ivCard.ok{border-left:4px solid var(--teal);}
+.ivCard.neu{border-left:4px solid var(--border-strong);}
+.ivHead{display:flex; align-items:flex-start; gap:10px; padding:11px 14px; border-bottom:1px solid var(--border); background:var(--surface);}
+.ivHead .no{flex:none; width:20px; height:20px; border-radius:5px; background:var(--bg); border:1px solid var(--border); font-size:10.5px; font-weight:700; color:var(--text-muted); display:flex; align-items:center; justify-content:center; margin-top:1px;}
+#ivDiag .ivName{flex:1; min-width:0; font-size:13px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; text-wrap:pretty;}
+.ivMetrics{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px 0; padding:9px 14px; border-bottom:1px solid var(--border);}
+@media(max-width:760px){.ivMetrics{grid-template-columns:repeat(3,minmax(0,1fr));}}
+.ivMetrics div{display:flex; flex-direction:column; gap:1px;}
+.ivMetrics .k{font-size:10px; letter-spacing:.06em; color:var(--text-muted);}
+.ivMetrics .v{font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap;}
+.ivMetrics .v.warn{color:var(--coral);}
+.ivMetrics .v.good{color:var(--teal);}
+.ivBody{padding:11px 14px;}
+.ivBodyLabel{font-size:10px; letter-spacing:.12em; color:var(--text-muted); margin:0 0 7px;}
 #ivDiag .ivTags{display:flex; flex-wrap:wrap; gap:3px; margin-top:5px;}
 #ivDiag.tagsOff .ivTags{display:none;}
 #ivDiag .ivTagCount{display:none; margin-top:4px; font-size:10.5px; color:var(--text-muted);}
@@ -449,13 +461,13 @@ section h2.collHead:hover{color:var(--accent);}
 .ivTagsBtn{height:26px; padding:0 10px; border:1px solid var(--border-strong); border-radius:6px; background:var(--surface); font-size:11.5px; color:var(--text-secondary); cursor:pointer; font-family:inherit;}
 .ivTagsBtn:hover{border-color:var(--accent); color:var(--accent);}
 #ivDiag .ivTags span{font-size:10.5px; line-height:1.4; padding:1px 5px; background:var(--bg); border:1px solid var(--border); color:var(--text-secondary); max-width:100%; overflow-wrap:anywhere;}
-#ivDiag td.numCell{white-space:nowrap; font-size:12px;}
-#ivDiag .ivFix{font-size:11.5px; line-height:1.6; color:var(--text); overflow-wrap:anywhere;}
-#ivDiag .ivFix li{list-style:none; display:flex; gap:5px; margin-bottom:5px;}
+#ivDiag .ivFix{font-size:12.5px; line-height:1.65; color:var(--text); overflow-wrap:anywhere;}
+#ivDiag .ivFix li{list-style:none; display:flex; gap:6px; margin-bottom:7px;}
 #ivDiag .ivFix li:last-child{margin-bottom:0;}
 #ivDiag .ivFix li::before{content:"→"; flex:none; color:var(--accent); font-weight:700;}
 #ivDiag .ivFix ul{margin:0; padding:0;}
-#ivDiag .ivFix .ev{color:var(--text-muted); font-size:10.5px;}
+#ivDiag .ivFix .ev{color:var(--text-muted); font-size:11px;}
+#ivDiag .ivTagsWrap{padding:0 14px 11px;}
 #ivDiag .ivFix .gen{color:var(--text-secondary);}
 #ivDiag .tag{white-space:nowrap;}
 /* 總覽重點面板 */
@@ -4979,28 +4991,43 @@ function renderImproveDiag(){
     + '｜CPC ' + mny(d.base.cpc) + '｜CPM ' + mny(d.base.cpm) + '｜CVR ' + pct(d.base.cvr) + '｜CPA ' + mny(d.base.cpa)
     + '　低樣本門檻 ' + d.thr.toLocaleString() + ' 曝光'
     + (d.untagged ? '　<b>' + d.untagged + ' 支尚未有視覺標籤</b>，建議先跑 AI 標籤，改善指示才能指到具體視覺元素。' : '') + '</p>';
-  var body = d.rows.map(function(r){
+  // 指標相對基準的好壞上色：CTR/CVR 越高越好、CPA/CPM 越低越好
+  var cls = function(v, base, lowerBetter){
+    if(v == null || base == null || !base || !isFinite(v)) return '';
+    var d2 = (v - base) / base;
+    if(Math.abs(d2) < 0.1) return '';
+    var good = lowerBetter ? d2 < 0 : d2 > 0;
+    return good ? ' good' : ' warn';
+  };
+  var body = d.rows.map(function(r, idx){
     var T = IV_TYPES[r.type];
-    var chips = r.tagArr && r.tagArr.length
-      ? '<div class="ivTags">' + r.tagArr.map(function(x){ return '<span>' + esc(x) + '</span>'; }).join('') + '</div>'
-        + '<div class="ivTagCount">' + r.tagArr.length + ' 個視覺標籤</div>'
+    var tone = (r.type === 'keep') ? 'ok' : (r.type === 'thin' || r.type === 'mid') ? 'neu' : 'pri';
+    var tags = r.tagArr && r.tagArr.length
+      ? '<div class="ivTagsWrap"><div class="ivTags">' + r.tagArr.map(function(x){ return '<span>' + esc(x) + '</span>'; }).join('') + '</div>'
+        + '<div class="ivTagCount">' + r.tagArr.length + ' 個視覺標籤</div></div>'
       : '';
-    return '<tr><td><div class="ivName">' + esc(r.name) + '</div>' + chips + '</td>'
-      + '<td><span class="tag ' + T.tag + '">' + T.label + '</span></td>'
-      + '<td class="numCell">' + pct(r.a.ctr) + '</td><td class="numCell">' + pct(r.a.cvr) + '</td>'
-      + '<td class="numCell">' + mny(r.a.cpa) + '</td><td class="numCell">' + mny(r.a.cpm) + '</td>'
-      + '<td class="numCell">' + r.a.impr.toLocaleString() + '</td><td class="numCell">' + mny(r.a.cost) + '</td>'
-      + '<td><div class="ivFix"><ul>' + (r.fixes || []).map(function(f){
+    var m = function(k, v, c){ return '<div><span class="k">' + k + '</span><span class="v' + (c || '') + '">' + v + '</span></div>'; };
+    return '<div class="ivCard ' + tone + '">'
+      + '<div class="ivHead"><span class="no">' + (idx + 1) + '</span>'
+      + '<div class="ivName">' + esc(r.name) + '</div>'
+      + '<span class="tag ' + T.tag + '">' + T.label + '</span></div>'
+      + '<div class="ivMetrics">'
+      + m('CTR', pct(r.a.ctr), cls(r.a.ctr, d.base.ctr, false))
+      + m('CVR', pct(r.a.cvr), cls(r.a.cvr, d.base.cvr, false))
+      + m('CPA', mny(r.a.cpa), cls(r.a.cpa, d.base.cpa, true))
+      + m('CPM', mny(r.a.cpm), cls(r.a.cpm, d.base.cpm, true))
+      + m('曝光', r.a.impr.toLocaleString(), '')
+      + m('花費', mny(r.a.cost), '')
+      + '</div>'
+      + tags
+      + '<div class="ivBody"><p class="ivBodyLabel">建議怎麼改</p><div class="ivFix"><ul>'
+      + (r.fixes || []).map(function(f){
           return '<li><span' + (f.gen ? ' class="gen"' : '') + '>' + esc(f.t)
             + (f.ev ? '<br><span class="ev">' + esc(f.ev) + '</span>' : '') + '</span></li>';
-        }).join('') + '</ul></div></td></tr>';
+        }).join('')
+      + '</ul></div></div></div>';
   }).join('');
-  box.innerHTML = head + '<div class="table-scroll"><table>'
-    + '<colgroup><col class="ivName"><col class="ivDx"><col class="ivNum"><col class="ivNum">'
-    + '<col class="ivNum"><col class="ivNum"><col class="ivNum"><col class="ivNum"><col class="ivFix"></colgroup>'
-    + '<thead><tr><th>素材</th><th>診斷</th>'
-    + '<th class="numCell">CTR</th><th class="numCell">CVR</th><th class="numCell">CPA</th><th class="numCell">CPM</th>'
-    + '<th class="numCell">曝光</th><th class="numCell">花費</th><th>建議怎麼改</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+  box.innerHTML = head + '<div class="ivCards">' + body + '</div>';
   var pref = null;
   try{ pref = localStorage.getItem('mt_iv_tags'); }catch(e){}
   var showTags = pref === 'on';

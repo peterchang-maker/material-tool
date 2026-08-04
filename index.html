@@ -436,6 +436,17 @@ section h2.collHead:hover{color:var(--accent);}
 .gfBody .dateBar{margin-bottom:10px;}
 .gfBody .sheetRow{margin-bottom:8px;}
 .gfThr{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-secondary);}
+/* 改善建議診斷表：長標籤字串原本不換行，會把整張表撐爆 */
+#ivDiag table{table-layout:fixed; width:100%; min-width:920px;}
+#ivDiag th,#ivDiag td{vertical-align:top; white-space:normal;}
+#ivDiag col.ivName{width:34%;} #ivDiag col.ivDx{width:88px;}
+#ivDiag col.ivNum{width:74px;} #ivDiag col.ivFix{width:20%;}
+#ivDiag .ivName{font-size:12.5px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; text-wrap:pretty;}
+#ivDiag .ivTags{display:flex; flex-wrap:wrap; gap:3px; margin-top:5px;}
+#ivDiag .ivTags span{font-size:10.5px; line-height:1.4; padding:1px 5px; background:var(--bg); border:1px solid var(--border); color:var(--text-secondary); max-width:100%; overflow-wrap:anywhere;}
+#ivDiag td.numCell{white-space:nowrap; font-size:12px;}
+#ivDiag .ivFix{font-size:11.5px; line-height:1.55; color:var(--text-secondary); overflow-wrap:anywhere;}
+#ivDiag .tag{white-space:nowrap;}
 /* 總覽重點面板 */
 .heroPanel{background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 1px 2px rgba(22,35,58,.04); margin-bottom:20px; overflow:hidden;}
 .heroTop{display:grid; grid-template-columns:1.6fr 1fr;}
@@ -4818,8 +4829,8 @@ function buildImproveList(){
     else if(base.ctr && a.ctr != null && a.ctr >= base.ctr && (a.cpa == null || !base.cpa || a.cpa <= base.cpa)) type = 'keep';
     else if(base.cpm && a.cpm != null && a.cpm > base.cpm * 1.3) type = 'deliver';
     else type = 'mid';
-    var tagStr = t ? dims.map(function(d){ return t[d] ? d + '=' + t[d] : null; }).filter(Boolean).join('｜') : '';
-    return { name: i.name, a: a, type: type, tags: tagStr, hasTags: !!t };
+    var tagArr = t ? dims.map(function(d){ return t[d] ? d + '=' + t[d] : null; }).filter(Boolean) : [];
+    return { name: i.name, a: a, type: type, tags: tagArr.join('｜'), tagArr: tagArr, hasTags: !!t };
   });
   rows.sort(function(x, y){
     var rank = { convert:0, hook:1, deliver:2, mid:3, thin:4, keep:5 };
@@ -4847,14 +4858,19 @@ function renderImproveDiag(){
     + (d.untagged ? '　<b>' + d.untagged + ' 支尚未有視覺標籤</b>，建議先跑 AI 標籤，改善指示才能指到具體視覺元素。' : '') + '</p>';
   var body = d.rows.map(function(r){
     var T = IV_TYPES[r.type];
-    return '<tr><td>' + esc(r.name) + (r.tags ? '<div class="sub" style="font-size:11px; margin-top:3px;">' + esc(r.tags) + '</div>' : '')
-      + '</td><td><span class="tag ' + T.tag + '">' + T.label + '</span></td>'
+    var chips = r.tagArr && r.tagArr.length
+      ? '<div class="ivTags">' + r.tagArr.map(function(x){ return '<span>' + esc(x) + '</span>'; }).join('') + '</div>' : '';
+    return '<tr><td><div class="ivName">' + esc(r.name) + '</div>' + chips + '</td>'
+      + '<td><span class="tag ' + T.tag + '">' + T.label + '</span></td>'
       + '<td class="numCell">' + pct(r.a.ctr) + '</td><td class="numCell">' + pct(r.a.cvr) + '</td>'
       + '<td class="numCell">' + mny(r.a.cpa) + '</td><td class="numCell">' + mny(r.a.cpm) + '</td>'
       + '<td class="numCell">' + r.a.impr.toLocaleString() + '</td><td class="numCell">' + mny(r.a.cost) + '</td>'
-      + '<td style="font-size:11.5px; color:var(--text-secondary);">' + esc(T.fix) + '</td></tr>';
+      + '<td><div class="ivFix">' + esc(T.fix) + '</div></td></tr>';
   }).join('');
-  box.innerHTML = head + '<div class="table-scroll"><table><thead><tr><th>素材</th><th>診斷</th>'
+  box.innerHTML = head + '<div class="table-scroll"><table>'
+    + '<colgroup><col class="ivName"><col class="ivDx"><col class="ivNum"><col class="ivNum">'
+    + '<col class="ivNum"><col class="ivNum"><col class="ivNum"><col class="ivNum"><col class="ivFix"></colgroup>'
+    + '<thead><tr><th>素材</th><th>診斷</th>'
     + '<th class="numCell">CTR</th><th class="numCell">CVR</th><th class="numCell">CPA</th><th class="numCell">CPM</th>'
     + '<th class="numCell">曝光</th><th class="numCell">花費</th><th>優先處理方向</th></tr></thead><tbody>' + body + '</tbody></table></div>';
 }

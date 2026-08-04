@@ -56,7 +56,18 @@
   .collCaret{display:inline-block; font-size:11px; color:var(--text-muted); transition:transform .18s ease; flex:none;}
   section.collapsed .collCaret{transform:rotate(-90deg);}
   section.collapsed > h2{margin-bottom:0;}
-  section.collapsed .collBody{display:none;}
+  /* 收合狀態提示：常駐顯示「點擊收合／已收合，點擊展開」，避免誤認功能消失 */
+  .collHint{margin-left:auto; font-size:11px; font-weight:400; color:var(--text-muted); flex:none; opacity:.7; transition:opacity .15s, color .15s;}
+  section h2.collHead:hover .collHint{opacity:1; color:var(--teal);}
+  section.collapsed .collHint{opacity:1; color:var(--teal);}
+  /* 展開／收合動畫：grid-template-rows 1fr↔0fr，內容高度平滑過渡而非瞬間消失
+     overflow:hidden 只在「收合中／動畫中」套用——常駐會裁掉 .sub 說明文字的負邊距上緣、
+     也讓區塊間距與原版不同 */
+  .collBody{display:grid; grid-template-rows:1fr; transition:grid-template-rows .28s ease;}
+  .collBody > .collInner{min-height:0;}
+  section.collapsed .collBody{grid-template-rows:0fr;}
+  section.collapsed .collBody > .collInner, .collBody.collAnim > .collInner{overflow:hidden;}
+  @media (prefers-reduced-motion:reduce){ .collBody{transition:none;} }
   /* 各維度占比分析 */
   .dsBox{margin-top:16px; padding:14px 16px; border:1px solid var(--border); border-radius:8px;}
   .dsMeta{display:flex; flex-wrap:wrap; gap:12px; font-size:11.5px; color:var(--text-secondary); margin-bottom:10px;}
@@ -116,7 +127,11 @@
   .listLabel{font-size:12.5px; font-weight:600;}
   .listCount{font-size:11.5px; color:var(--text-muted); border:1px solid var(--border); border-radius:20px; padding:1px 8px;}
   .listHint{margin-left:auto; font-size:11px; color:var(--text-muted);}
-  .listCollapsed .listBody{display:none;}
+  .listBody{display:grid; grid-template-rows:1fr; transition:grid-template-rows .28s ease;}
+  .listBody > .listInner{min-height:0;}
+  .listCollapsed .listBody{grid-template-rows:0fr;}
+  .listCollapsed .listBody > .listInner, .listBody.collAnim > .listInner{overflow:hidden;}
+  @media (prefers-reduced-motion:reduce){ .listBody{transition:none;} }
   .mdBox{margin-top:16px; padding:14px 16px; border:1px dashed var(--border); border-radius:8px; background:rgba(91,123,181,.05);}
   .mdTitle{font-size:13.5px; font-weight:600; margin:0 0 4px;}
   .mdSub{font-size:11.5px; font-weight:400; color:var(--text-muted);}
@@ -201,6 +216,10 @@
   .primaryBtn:disabled{opacity:.5; cursor:not-allowed;}
   .primaryBtn:hover:not(:disabled){background:#0c5b46;}
   .featTag{display:inline-block; padding:2px 7px; border-radius:6px; font-size:11px; margin:0 4px 4px 0; background:var(--bg); color:var(--text-secondary); border:1px solid var(--border);}
+  /* 素材級 AI 優化建議卡 */
+  .aiSugBox{margin-top:8px; padding:8px 12px; border-left:3px solid var(--teal); background:var(--teal-bg); border-radius:0 8px 8px 0; font-size:12px; line-height:1.65; color:var(--text-primary, inherit); white-space:pre-wrap;}
+  .aiSugBox .aiSugLabel{display:block; font-size:11px; font-weight:600; color:var(--teal); margin-bottom:3px;}
+  .aiSugBox.empty{border-left-color:var(--border); background:var(--bg); color:var(--text-muted); font-size:11.5px;}
   .progressText{font-size:12.5px; color:var(--text-secondary); margin-top:10px;}
   .aiSummary{border-left:3px solid var(--teal); background:var(--teal-bg); border-radius:0 8px 8px 0; padding:14px 18px; font-size:13.5px; white-space:pre-wrap;}
 
@@ -576,7 +595,7 @@ section h2.collHead:hover{color:var(--accent);}
         <span id="excelImgInfo"></span>
         <button class="primaryBtn" id="downloadImgZipBtn" style="height:28px; font-size:12px; padding:0 12px;">下載圖片包（.zip）</button>
       </div>
-      <p class="sub" style="margin:0 0 14px;">這個工具不直接呼叫 AI API，而是幫你產生 Prompt，你貼到 Gemini 視窗、上傳圖片取得結果後，再把結果貼回這裡合併進圖表與洞察。標籤涵蓋畫面構成 12 維（色調、主色系、人物、版面配置、CTA…）＋內容策略 6 維（訴求類型、品牌露出、遊戲畫面、特效強度、獎勵元素、懷舊元素），共 18 個維度。檔名建議包含賣點關鍵字（如「coupon倒數沙漏」）以利自動配對。</p>
+      <p class="sub" style="margin:0 0 14px;">這個工具不直接呼叫 AI API，而是幫你產生 Prompt，你貼到 Gemini 視窗、上傳圖片取得結果後，再把結果貼回這裡合併進圖表與洞察。標籤涵蓋畫面構成 12 維（色調、主色系、人物、版面配置、CTA…）＋內容策略 6 維（訴求類型、品牌露出、遊戲畫面、特效強度、獎勵元素、懷舊元素），共 18 個維度；並會依「視覺特徵 × 實際成效」為每支素材附上素材級 AI 優化建議（如文字放大、獎勵露出加強、畫面簡化、CTA 強化），可直接應用於下一輪素材製作。檔名建議包含賣點關鍵字（如「coupon倒數沙漏」）以利自動配對。</p>
 
       <div class="imgUpload" id="imgUpload">
         <p class="main" style="font-size:13px;">點擊或拖曳素材圖片到這裡（僅用於配對預覽，不會上傳到任何伺服器）</p>
@@ -2072,6 +2091,11 @@ const TAG_FIELDS = [
   ["獎勵元素","虛寶金幣或裝備道具或轉蛋抽獎或無"],
   ["懷舊元素","有或無"]
 ];
+// 素材級 AI 優化建議：保留欄位（不屬於 18 維特徵，獨立於卡片下方呈現）
+// 用意：讓 AI 依「視覺特徵 × 實際成效」對每支素材直接給出可執行的改善方向，
+// 分析結果能直接應用於下一輪素材製作，而不只停在整體洞察層級。
+const SUGGEST_FIELD = '優化建議';
+const SUGGEST_HINT = '結合此素材的視覺特徵與實際成效數據，用繁體中文給出1-3點具體改善方向（例：文字放大、獎勵露出加強、畫面簡化、CTA強化、主色調整、人物占比調整），多點之間用分號分隔；若成效已佳，請改寫出值得延續的做法；若無配對成效數據，僅依視覺特徵給建議並註明(無成效數據)';
 function getCustomDims(){ return lsGet(LS.customDims, []); }
 // 市場專屬維度：只標市場素材，用來發掘我方完全沒做過的視覺手法
 function getMarketDims(){ return lsGet(LS.marketDims, []); }
@@ -2112,6 +2136,8 @@ function marketAllDims(){ return allCrossDims().concat(getMarketDims().map(d=>d.
 function getTagSchema(isMarket){
   let fields = TAG_FIELDS.concat(getCustomDims().map(d=>[d.name, d.hint || '請依素材內容判斷']));
   if(isMarket) fields = fields.concat(getMarketDims().map(d=>[d.name, d.hint || '請依素材內容判斷']));
+  // 我方素材才需要優化建議；市場素材是競品，給建議沒有意義
+  if(!isMarket) fields = fields.concat([[SUGGEST_FIELD, SUGGEST_HINT]]);
   return '{\n' + fields.map(([k,v])=>`  "${k}":"${v}"`).join(',\n') + '\n}';
 }
 
@@ -2144,6 +2170,7 @@ ${getTagSchema(false)}
 - 「人物類型」要判斷是真人實拍照片/影片截圖、AI生成人像（觀察手指數量、皮膚紋理是否過於平滑、背景是否有變形扭曲等AI生成痕跡）、遊戲手繪立繪、還是3D建模角色，如果無法確定請選最接近的選項並可在後面加註「(不確定)」。
 - 「人物大小占比」請目測該人物在整張畫面中的面積比例。
 - 同一張圖若有多個人物，請以畫面中最主要/最大的人物為準。
+- 「優化建議」必須結合該素材的實際成效數據（見上方清單）：CTR明顯偏低的素材，建議要針對可能拖累點擊的視覺弱點（如文字太小、CTA模糊、畫面過密、獎勵不明顯）；CTR偏高的素材，請寫出值得延續複製的做法。曝光量過低（例如低於1000）的素材，數據僅供參考，建議中請註明。
 
 【任務二】結合上方成效數據與你標註的視覺特徵，用繁體中文寫出 2-4 點「哪些視覺特徵與高/低 CTR 相關」的具體洞察，以及下次製作素材的行動建議。
 
@@ -2220,8 +2247,13 @@ function renderAiTable(){
     const tags = aiResults[img.name];
     const perf = img.matchedRow;
     const tagHtml = tags
-      ? Object.entries(tags).filter(([k])=>k!=='檔名').map(([k,v])=>`<span class="featTag">${esc(k)}:${esc(v)}</span>`).join('')
+      ? Object.entries(tags).filter(([k])=>k!=='檔名' && k!==SUGGEST_FIELD).map(([k,v])=>`<span class="featTag">${esc(k)}:${esc(v)}</span>`).join('')
       : '<span style="color:var(--text-muted); font-size:12px;">尚未套用分析結果</span>';
+    // 素材級 AI 優化建議：有建議顯示建議卡；舊資料（重新分析前）給提示避免誤以為功能壞了
+    const sug = tags && typeof tags[SUGGEST_FIELD] === 'string' ? tags[SUGGEST_FIELD].trim() : '';
+    const sugHtml = sug
+      ? `<div class="aiSugBox"><span class="aiSugLabel">💡 AI 優化建議</span>${esc(sug)}</div>`
+      : (tags ? `<div class="aiSugBox empty">💡 此筆標籤產生於舊版流程，重跑「一鍵 AI 分析」或重新產生 Prompt 後即會附上素材級優化建議</div>` : '');
     return `
       <div style="display:flex; gap:14px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border);">
         <input type="checkbox" class="cmpCheck" data-idx="${idx}" title="勾選以對比" style="margin-top:24px; width:16px; height:16px;">
@@ -2230,6 +2262,7 @@ function renderAiTable(){
           <p style="margin:0 0 4px; font-size:12.5px; font-weight:500;">${esc(img.name)}</p>
           ${perf ? `<p style="margin:0 0 6px; font-size:11.5px; color:var(--text-secondary);">配對：${esc(perf.賣點)}　CTR ${fmtPct(perf.CTR)}　點擊 ${fmtInt(perf.點擊)}</p>` : `<p style="margin:0 0 6px; font-size:11.5px; color:var(--coral);">未配對到成效資料</p>`}
           <div>${tagHtml}</div>
+          ${sugHtml}
         </div>
       </div>
     `;
@@ -2381,7 +2414,12 @@ function renderCompare(){
 document.getElementById('genSummaryPromptBtn').addEventListener('click', ()=>{
   const records = uploadedImages
     .filter(img => img.matchedRow && aiResults[img.name])
-    .map(img => ({ 賣點: img.matchedRow.賣點, CTR: img.matchedRow.CTR, 點擊: img.matchedRow.點擊, 特徵: aiResults[img.name] }));
+    .map(img => {
+      // 特徵餵給整體洞察時剔除「優化建議」——它是輸出不是輸入，塞回去會干擾模型歸因
+      const feat = {};
+      Object.entries(aiResults[img.name]).forEach(([k,v])=>{ if(k!==SUGGEST_FIELD) feat[k]=v; });
+      return { 賣點: img.matchedRow.賣點, CTR: img.matchedRow.CTR, 點擊: img.matchedRow.點擊, 特徵: feat };
+    });
 
   if(records.length < 2){
     document.getElementById('aiSummaryWrap').innerHTML = `<div class="errBox">至少需要2筆成功配對成效數據的素材才能產生洞察摘要，目前只有 ${records.length} 筆。</div>`;
@@ -3013,9 +3051,12 @@ async function autoTagImages(images, onProgress, isMarket){
     const head = isMarket
       ? `你是遊戲行銷素材分析師。以下是「市場上其他遊戲」的廣告素材，請為每一張輸出視覺特徵標籤。`
       : `你是遊戲行銷素材分析師。以下是我方遊戲的廣告素材，請為每一張輸出視覺特徵標籤。`;
+    // 我方素材：附上實際成效，讓「優化建議」有數據依據而非憑空看圖
+    const suggestGuide = isMarket ? '' : `
+- 「優化建議」必須結合該素材的【成效】數據：CTR明顯偏低者，建議針對可能拖累點擊的視覺弱點（文字太小、CTA模糊、畫面過密、獎勵不明顯等）；CTR偏高者，寫出值得延續複製的做法。曝光過低（<1000）的數據僅供參考，請在建議中註明。無【成效】行的圖片僅依視覺特徵給建議並註明(無成效數據)。`;
     const parts = [{ text: `${head}
 
-每張圖片前會先給一行【檔名】，回傳時「檔名」欄位必須與之完全一致。
+每張圖片前會先給一行【檔名】${isMarket ? '' : '，我方素材另可能附一行【成效】投放數據'}，回傳時「檔名」欄位必須與之完全一致。
 欄位格式如下：
 ${getTagSchema(isMarket)}
 
@@ -3023,12 +3064,16 @@ ${getTagSchema(isMarket)}
 - 「訴求類型」：主打折扣/贈品=促銷優惠；喚起回憶/情懷=情感懷舊；展示強度/裝備/戰力=實力展示；解說玩法/版本內容=內容資訊；賣關子=懸念好奇。
 - 「遊戲畫面展示」：出現真實遊戲UI（血條/技能欄/小地圖）=實機介面；僅宣傳美術=純美術；兩者皆有=混合。
 - 「懷舊元素」：出現經典舊版畫面、像素風、「當年/回憶」等語彙即為「有」。
-- 「人物類型」若無法確定，選最接近的並在後面加註「(不確定)」。
+- 「人物類型」若無法確定，選最接近的並在後面加註「(不確定)」。${suggestGuide}
 
 請只回傳 JSON 物件：{"標籤":[每張圖片各一筆，依我提供的順序]}，不要任何其他文字。` }];
     chunk.forEach(img=>{
       const p = imgPart(img.dataUrl);
       parts.push({ text: `【檔名】${img.name}` });
+      if(!isMarket && img.matchedRow){
+        const r = img.matchedRow;
+        parts.push({ text: `【成效】CTR ${r.CTR!=null?(r.CTR*100).toFixed(2)+'%':'-'}｜點擊 ${r.點擊||0}｜曝光 ${r.曝光||0}` });
+      }
       if(p) parts.push(p);
     });
     const txt = await callGemini(parts);
@@ -3063,7 +3108,7 @@ document.getElementById('autoAnalyzeBtn').addEventListener('click', async ()=>{
     // 洞察：把特徵與實際成效一起交給模型
     const lines = targets.filter(i=>i.matchedRow && aiResults[i.name]).map(i=>{
       const r = i.matchedRow, t = aiResults[i.name];
-      const feat = Object.entries(t).filter(([k])=>k !== '檔名').map(([k, v])=>`${k}:${v}`).join('、');
+      const feat = Object.entries(t).filter(([k])=>k !== '檔名' && k !== SUGGEST_FIELD).map(([k, v])=>`${k}:${v}`).join('、');
       return `- ${i.name}｜CTR ${r.CTR != null ? (r.CTR * 100).toFixed(2) + '%' : '-'}｜曝光 ${r.曝光 || 0}｜特徵：${feat}`;
     }).join('\n');
     if(lines){
@@ -3265,8 +3310,8 @@ document.getElementById('cdAddBtn').addEventListener('click', ()=>{
   if(name.length > 20 || hint.length > 80){
     alert('維度名稱請在 20 字內、選項提示在 80 字內'); return;
   }
-  if(name==='檔名' || TAG_FIELDS.some(f=>f[0]===name) || getCustomDims().some(d=>d.name===name)){
-    alert(`「${name}」與既有維度重複`); return;
+  if(name==='檔名' || name===SUGGEST_FIELD || TAG_FIELDS.some(f=>f[0]===name) || getCustomDims().some(d=>d.name===name)){
+    alert(`「${name}」與既有維度或保留欄位重複`); return;
   }
   const dims = getCustomDims();
   dims.push({name, hint});
@@ -3300,8 +3345,8 @@ function validDimInput(name, hint){
   if(name.length > 20 || hint.length > 80){
     alert('維度名稱請在 20 字內、選項提示在 80 字內'); return false;
   }
-  if(name==='檔名' || TAG_FIELDS.some(f=>f[0]===name) || getCustomDims().some(d=>d.name===name) || getMarketDims().some(d=>d.name===name)){
-    alert(`「${name}」與既有維度重複`); return false;
+  if(name==='檔名' || name===SUGGEST_FIELD || TAG_FIELDS.some(f=>f[0]===name) || getCustomDims().some(d=>d.name===name) || getMarketDims().some(d=>d.name===name)){
+    alert(`「${name}」與既有維度或保留欄位重複`); return false;
   }
   return true;
 }
@@ -4768,7 +4813,10 @@ function attachListCollapse(container, key, label, count, defaultCollapsed){
 
   const body = document.createElement('div');
   body.className = 'listBody';
-  while(container.firstChild) body.appendChild(container.firstChild);
+  const inner = document.createElement('div');
+  inner.className = 'listInner';
+  while(container.firstChild) inner.appendChild(container.firstChild);
+  body.appendChild(inner);
 
   const head = document.createElement('div');
   head.className = 'listHead';
@@ -4782,6 +4830,7 @@ function attachListCollapse(container, key, label, count, defaultCollapsed){
   head.querySelector('.listHint').textContent = collapsed ? '已收合，點擊展開' : '點擊收合';
 
   head.addEventListener('click', ()=>{
+    if(window.__collPulse) window.__collPulse(body);
     const now = container.classList.toggle('listCollapsed');
     const s2 = lsGet(LS.collapse, {});
     s2[stKey] = now ? 1 : 0;
@@ -5332,6 +5381,15 @@ initCollapsible();
 // ══════════════════════════════════════════════════════════
 function initCollapsible(){
   const state = lsGet(LS.collapse, {});
+  // 動畫期間暫時套 overflow:hidden（collAnim），結束後移除，
+  // 讓展開狀態下的負邊距內容（.sub 說明文字）維持與原版相同的排版
+  const collPulse = body => {
+    if(!body) return;
+    body.classList.add('collAnim');
+    clearTimeout(body.__collT);
+    body.__collT = setTimeout(()=>body.classList.remove('collAnim'), 320);
+  };
+  window.__collPulse = collPulse;
   document.querySelectorAll('main section, .wrap section, body section').forEach((sec, idx)=>{
     const h2 = sec.querySelector(':scope > h2');
     if(!h2 || sec.dataset.collapsibleReady) return;
@@ -5340,31 +5398,42 @@ function initCollapsible(){
     const key = sec.id || ('sec_' + idx + '_' + (h2.textContent||'').trim().slice(0,12));
     sec.dataset.collKey = key;
 
-    // 把 h2 之後的所有兄弟節點搬進 body 容器
+    // 把 h2 之後的所有兄弟節點搬進 body > inner 雙層容器
+    // （外層跑 grid-template-rows 動畫，內層 min-height:0 + overflow:hidden 讓高度能收到 0）
     const body = document.createElement('div');
     body.className = 'collBody';
+    const inner = document.createElement('div');
+    inner.className = 'collInner';
     const moving = [];
     let n = h2.nextSibling;
     while(n){ moving.push(n); n = n.nextSibling; }
-    moving.forEach(node=>body.appendChild(node));
+    moving.forEach(node=>inner.appendChild(node));
+    body.appendChild(inner);
     sec.appendChild(body);
 
-    // h2 改造成可點擊標題
+    // h2 改造成可點擊標題：箭頭＋常駐狀態提示，避免誤認「功能消失」
     h2.classList.add('collHead');
     const caret = document.createElement('span');
     caret.className = 'collCaret';
     caret.textContent = '▾';
     h2.insertBefore(caret, h2.firstChild);
+    const hint = document.createElement('span');
+    hint.className = 'collHint';
+    h2.appendChild(hint);
+    const setHint = c => { hint.textContent = c ? '已收合，點擊展開' : '點擊收合'; };
 
     const collapsed = !!state[key];
     if(collapsed){ sec.classList.add('collapsed'); }
+    setHint(collapsed);
 
     h2.addEventListener('click', ()=>{
+      collPulse(body);
       const now = sec.classList.toggle('collapsed');
+      setHint(now);
       const st = lsGet(LS.collapse, {});
       if(now) st[key] = 1; else delete st[key];
       lsSet(LS.collapse, st);
-      // 展開時讓圖表重新量測尺寸（收合期間 canvas 寬度為 0）
+      // 展開時讓圖表重新量測尺寸（收合期間 canvas 高度為 0）
       if(!now && typeof Chart !== 'undefined' && Chart.getChart){
         sec.querySelectorAll('canvas').forEach(cv=>{
           const ch = Chart.getChart(cv);
@@ -5374,31 +5443,60 @@ function initCollapsible(){
     });
   });
 
-  // 全域「全部展開／收合」工具列（插在第一個可收合區塊之前）
-  const first = document.querySelector('section[data-coll-key]');
-  if(first && !document.getElementById('collAllBar')){
+  // 「全部展開／收合」工具列：每個含可收合區塊的分頁各插一條，
+  // 切到任何分頁都有明顯的復原入口（舊版只出現在總覽頁）。
+  // 同名 data-page 可能有多個容器（總覽頁即拆成兩個 div）：
+  // 工具列只插在該頁第一個含收合區塊的容器，但作用範圍涵蓋同名全部容器。
+  const pages = [...document.querySelectorAll('.v3page')];
+  if(pages.length){
+    const byName = new Map();
+    pages.forEach(p=>{
+      const name = p.getAttribute('data-page') || '';
+      if(!byName.has(name)) byName.set(name, []);
+      byName.get(name).push(p);
+    });
+    byName.forEach((els, name)=>{
+      const host = els.find(el=>el.querySelector('section[data-coll-key]'));
+      if(!host || els.some(el=>el.querySelector('.collAllBar'))) return;
+      const bar = document.createElement('div');
+      bar.className = 'collAllBar';
+      bar.innerHTML = '<button type="button" class="collExpandAllBtn">全部展開</button><button type="button" class="collCollapseAllBtn">全部收合</button>';
+      const firstSec = host.querySelector('section[data-coll-key]');
+      firstSec.parentNode.insertBefore(bar, firstSec);
+      bar.querySelector('.collExpandAllBtn').addEventListener('click', ()=>setAllCollapsed(false, name));
+      bar.querySelector('.collCollapseAllBtn').addEventListener('click', ()=>setAllCollapsed(true, name));
+    });
+  } else if(document.querySelector('section[data-coll-key]') && !document.querySelector('.collAllBar')){
+    const first = document.querySelector('section[data-coll-key]');
     const bar = document.createElement('div');
-    bar.id = 'collAllBar';
     bar.className = 'collAllBar';
-    bar.innerHTML = '<button type="button" id="collExpandAll">全部展開</button><button type="button" id="collCollapseAll">全部收合</button>';
+    bar.innerHTML = '<button type="button" class="collExpandAllBtn">全部展開</button><button type="button" class="collCollapseAllBtn">全部收合</button>';
     first.parentNode.insertBefore(bar, first);
-    document.getElementById('collExpandAll').addEventListener('click', ()=>setAllCollapsed(false));
-    document.getElementById('collCollapseAll').addEventListener('click', ()=>setAllCollapsed(true));
+    bar.querySelector('.collExpandAllBtn').addEventListener('click', ()=>setAllCollapsed(false, null));
+    bar.querySelector('.collCollapseAllBtn').addEventListener('click', ()=>setAllCollapsed(true, null));
   }
 }
 // 全部展開／收合
-function setAllCollapsed(flag){
-  const st = {};
-  document.querySelectorAll('section[data-coll-key]').forEach(sec=>{
+function setAllCollapsed(flag, pageName){
+  // pageName 為分頁名稱時，涵蓋所有同名容器（總覽頁拆成兩個 div）；null 則全域
+  const secs = pageName
+    ? [...document.querySelectorAll('.v3page[data-page="' + pageName + '"] section[data-coll-key]')]
+    : [...document.querySelectorAll('section[data-coll-key]')];
+  // 只改動範圍內區塊的狀態鍵：舊版整包覆寫會連清單收合（list:*）與其他分頁狀態一併清掉
+  const st = lsGet(LS.collapse, {});
+  secs.forEach(sec=>{
+    if(window.__collPulse) window.__collPulse(sec.querySelector(':scope > .collBody'));
     sec.classList.toggle('collapsed', flag);
-    if(flag) st[sec.dataset.collKey] = 1;
+    const hint = sec.querySelector(':scope > h2 .collHint');
+    if(hint) hint.textContent = flag ? '已收合，點擊展開' : '點擊收合';
+    if(flag) st[sec.dataset.collKey] = 1; else delete st[sec.dataset.collKey];
   });
   lsSet(LS.collapse, st);
   if(!flag && typeof Chart !== 'undefined' && Chart.getChart){
-    document.querySelectorAll('canvas').forEach(cv=>{
+    secs.forEach(sec=>sec.querySelectorAll('canvas').forEach(cv=>{
       const ch = Chart.getChart(cv);
       if(ch){ try{ ch.resize(); }catch(e){} }
-    });
+    }));
   }
 }
 </script>

@@ -463,6 +463,8 @@ section h2.collHead:hover{color:var(--accent);}
     <button data-nav="ai">AI 視覺標籤</button>
     <div class="v3navGroup">市場</div>
     <button data-nav="market">競品對比</button>
+    <div class="v3navGroup">建議</div>
+    <button data-nav="advice">素材建議</button>
     <div class="v3navGroup">資料</div>
     <button data-nav="history">歷史與備份</button>
   </nav>
@@ -899,7 +901,38 @@ section h2.collHead:hover{color:var(--accent);}
       <div id="mvsGaps"></div>
       <div id="mvsMarketOnly"></div>
 
-      <!-- 收斂點：把我方成效 × 市場分佈 × 市場專屬手法一次餵給 AI -->
+    </section>
+
+
+</div></div>
+<div class="v3page" data-page="advice">
+    <section>
+      <h2>現有素材改善建議</h2>
+      <p class="sub" style="margin:0 0 14px;">下一波建議是「接下來做什麼新的」，這一區是「手上這批素材怎麼救」。工具先用成效數字做規則診斷，把每支素材分成「該保留當母本」「不夠吸睛」「吸睛但不轉換」「投遞成本偏高」「樣本不足」，再交給 AI 針對問題素材寫出具體的修改指示。</p>
+      <div id="ivDiag"><p class="empty">需要已上傳 Excel 成效資料＋已完成 AI 視覺標籤的素材，診斷會自動出現。</p></div>
+      <div class="nwBox" style="margin-top:18px;">
+        <p class="mdTitle">AI 逐支改善指示 <span class="mdSub">針對診斷出問題的素材，寫出可直接交付的修改規格</span></p>
+        <div class="controls" style="margin-bottom:8px;">
+          <select id="ivScope" style="min-width:200px;">
+            <option value="problem">只分析有問題的素材</option>
+            <option value="all">分析全部素材</option>
+            <option value="spend">花費最高的 8 支</option>
+          </select>
+          <input id="ivContext" placeholder="補充脈絡（選填），例：只能改圖不能重拍、下週要上線" style="flex:1; min-width:240px;">
+          <button class="primaryBtn" id="improveBtn" style="height:34px; font-size:13px;">⚡ AI 產出改善建議</button>
+          <button class="ghostBtn" id="ivCopyBtn" style="display:none;">複製建議</button>
+        </div>
+        <div id="ivProgress" style="display:none; margin-top:10px;">
+          <div class="progTrack"><div class="progBar" id="ivProgBar"></div></div>
+          <span class="progressText" id="ivProgText"></span>
+        </div>
+        <div id="ivOutput"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>下一波素材建議</h2>
+      <p class="sub" style="margin:0 0 12px;">需要「競品對比」頁已完成我方與市場的標籤，才能形成三方收斂。</p>
       <div class="nwBox">
         <p class="mdTitle">下一波素材建議 <span class="mdSub">前面所有分析的收斂點——導向一個可執行的製作方向</span></p>
         <p class="sub" style="margin:0 0 10px; font-size:12px;">AI 會同時讀取三份資料：①我方素材的標籤 × 實際 CTR／CPA（哪些特徵真的有效）②市場素材的特徵分佈（競品在押什麼）③市場專屬維度（競品有、我們沒有的手法），產出下一波素材的具體製作建議。</p>
@@ -915,9 +948,8 @@ section h2.collHead:hover{color:var(--accent);}
         <div id="nwOutput"></div>
       </div>
     </section>
-
-
 </div>
+
 <div class="v3page" data-page="history">
     <section>
       <h2>歷史庫與資料備份</h2>
@@ -2880,7 +2912,7 @@ function refreshApiUI(){
   badge.className = 'apiBadge ' + (on ? 'on' : 'off');
   // AI 按鈕：一律顯示（讓使用者知道有這些功能），未設定 API Key 時停用並提示
   // —— 過去是直接隱藏，導致「功能突然不見」的困惑。
-  ['autoAnalyzeBtn','mkAutoTagBtn','cdSuggestBtn','mdSuggestBtn','nextWaveBtn','svAiBtn','aiReportBtn'].forEach(id=>{
+  ['autoAnalyzeBtn','mkAutoTagBtn','cdSuggestBtn','mdSuggestBtn','nextWaveBtn','improveBtn','svAiBtn','aiReportBtn'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
     el.style.display = '';
@@ -2894,7 +2926,7 @@ function refreshApiUI(){
   const aa = document.getElementById('autoAnalyzeBtn');
   // 一鍵分析另有「要有圖片」的條件，兩者皆須滿足才可按
   if(aa) aa.disabled = !on || uploadedImages.length === 0;
-  ['mkAutoTagBtn','cdSuggestBtn','mdSuggestBtn','nextWaveBtn','svAiBtn','aiReportBtn'].forEach(id=>{
+  ['mkAutoTagBtn','cdSuggestBtn','mdSuggestBtn','nextWaveBtn','improveBtn','svAiBtn','aiReportBtn'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.disabled = !on;
   });
@@ -4589,6 +4621,7 @@ function renderMarketCompare(){
 
   // 供「下一波素材建議」取用
   window.__lastCross = { findings, dOwn, dMkt, overall, ownN: own.length, mktN: mkt.length, ownPerfN: ownPerf.length };
+  if(window.__renderImproveDiag) try{ window.__renderImproveDiag(); }catch(e){}
   renderMarketOnlyDims(dMkt);
 }
 
@@ -4743,6 +4776,182 @@ function buildNextWaveContext(){
   return { ownLines, ownFeat: ownFeat.join('\n'), ownBase, mktLines, moLines, findLines,
            overall, ownN: ownPerf.length, mktN: mktTagged.length, mDims };
 }
+
+
+// ══════════════════════════════════════════════════════════
+// 現有素材改善建議
+// 規則診斷（不需 AI）→ 分類問題型態 → 交給 AI 寫逐支修改指示
+// 判斷刻意走完整漏斗：CTR 只說明吸睛度，CVR / CPA 才說明有沒有效
+// ══════════════════════════════════════════════════════════
+function ivAgg(list){
+  var sum = function(f){ return list.reduce(function(a, i){ return a + (Number(f(i.matchedRow)) || 0); }, 0); };
+  var impr = sum(function(r){ return r.曝光; });
+  var click = sum(function(r){ return r.點擊; });
+  var cost = sum(function(r){ return r.費用; });
+  var conv = sum(function(r){ return r.預約次數 != null ? r.預約次數 : r.安裝次數; });
+  return { n: list.length, impr: impr, click: click, cost: cost, conv: conv,
+    ctr: impr ? click / impr : null, cpc: click ? cost / click : null,
+    cpm: impr ? cost / impr * 1000 : null, cvr: click ? conv / click : null,
+    cpa: conv ? cost / conv : null };
+}
+var IV_TYPES = {
+  keep:   { label:'可當母本', tag:'tag-teal',   fix:'表現優於基準，重點是保留有效元素、只做變體延伸' },
+  hook:   { label:'不夠吸睛', tag:'tag-coral',  fix:'CTR 明顯低於基準：問題在前 3 秒／主視覺／標題，不是落地頁' },
+  convert:{ label:'吸睛不轉換', tag:'tag-coral', fix:'CTR 好但 CPA 偏貴：素材承諾與實際遊戲內容或受眾不符' },
+  deliver:{ label:'投遞成本高', tag:'tag-amber', fix:'CPM 偏高：受眾過窄或素材與版位規格不合' },
+  thin:   { label:'樣本不足', tag:'tag-neutral', fix:'曝光低於警示門檻，先加曝光再判斷，勿急著改' },
+  mid:    { label:'中段表現', tag:'tag-neutral', fix:'各項指標接近基準，可小幅測試單一變因' }
+};
+function buildImproveList(){
+  var tagged = uploadedImages.filter(function(i){ return i.matchedRow; });
+  if(tagged.length < 3) return { err:'需要至少 3 支已對上成效資料的素材，目前 ' + tagged.length + ' 支。請先上傳 Excel 並在「AI 視覺標籤」頁上傳對應素材圖。' };
+  var base = ivAgg(tagged);
+  var thr = getImprThreshold();
+  var dims = (typeof allCrossDims === 'function') ? allCrossDims() : [];
+  var rows = tagged.map(function(i){
+    var a = ivAgg([i]);
+    var t = aiResults[i.name] || null;
+    var type;
+    if(a.impr < thr) type = 'thin';
+    else if(base.ctr && a.ctr != null && a.ctr < base.ctr * 0.8) type = 'hook';
+    else if(base.cpa && a.cpa != null && a.cpa > base.cpa * 1.2) type = 'convert';
+    else if(base.ctr && a.ctr != null && a.ctr >= base.ctr && (a.cpa == null || !base.cpa || a.cpa <= base.cpa)) type = 'keep';
+    else if(base.cpm && a.cpm != null && a.cpm > base.cpm * 1.3) type = 'deliver';
+    else type = 'mid';
+    var tagStr = t ? dims.map(function(d){ return t[d] ? d + '=' + t[d] : null; }).filter(Boolean).join('｜') : '';
+    return { name: i.name, a: a, type: type, tags: tagStr, hasTags: !!t };
+  });
+  rows.sort(function(x, y){
+    var rank = { convert:0, hook:1, deliver:2, mid:3, thin:4, keep:5 };
+    if(rank[x.type] !== rank[y.type]) return rank[x.type] - rank[y.type];
+    return y.a.cost - x.a.cost;
+  });
+  return { rows: rows, base: base, thr: thr, untagged: rows.filter(function(r){ return !r.hasTags; }).length };
+}
+function renderImproveDiag(){
+  var box = document.getElementById('ivDiag');
+  if(!box) return;
+  var d = buildImproveList();
+  if(d.err){ box.innerHTML = '<p class="empty">' + esc(d.err) + '</p>'; return; }
+  var pct = function(v){ return v == null ? '-' : (v * 100).toFixed(2) + '%'; };
+  var mny = function(v){ return (v == null || !isFinite(v)) ? '-' : '$' + Math.round(v).toLocaleString(); };
+  var counts = {};
+  d.rows.forEach(function(r){ counts[r.type] = (counts[r.type] || 0) + 1; });
+  var chips = Object.keys(IV_TYPES).filter(function(k){ return counts[k]; }).map(function(k){
+    return '<span class="tag ' + IV_TYPES[k].tag + '">' + IV_TYPES[k].label + ' ' + counts[k] + '</span>';
+  }).join(' ');
+  var head = '<div class="controls" style="margin:0 0 10px; gap:6px;">' + chips + '</div>'
+    + '<p class="sub" style="margin:0 0 10px; font-size:12px;">基準線（' + d.base.n + ' 支加總）：CTR ' + pct(d.base.ctr)
+    + '｜CPC ' + mny(d.base.cpc) + '｜CPM ' + mny(d.base.cpm) + '｜CVR ' + pct(d.base.cvr) + '｜CPA ' + mny(d.base.cpa)
+    + '　低樣本門檻 ' + d.thr.toLocaleString() + ' 曝光'
+    + (d.untagged ? '　<b>' + d.untagged + ' 支尚未有視覺標籤</b>，建議先跑 AI 標籤，改善指示才能指到具體視覺元素。' : '') + '</p>';
+  var body = d.rows.map(function(r){
+    var T = IV_TYPES[r.type];
+    return '<tr><td>' + esc(r.name) + (r.tags ? '<div class="sub" style="font-size:11px; margin-top:3px;">' + esc(r.tags) + '</div>' : '')
+      + '</td><td><span class="tag ' + T.tag + '">' + T.label + '</span></td>'
+      + '<td class="numCell">' + pct(r.a.ctr) + '</td><td class="numCell">' + pct(r.a.cvr) + '</td>'
+      + '<td class="numCell">' + mny(r.a.cpa) + '</td><td class="numCell">' + mny(r.a.cpm) + '</td>'
+      + '<td class="numCell">' + r.a.impr.toLocaleString() + '</td><td class="numCell">' + mny(r.a.cost) + '</td>'
+      + '<td style="font-size:11.5px; color:var(--text-secondary);">' + esc(T.fix) + '</td></tr>';
+  }).join('');
+  box.innerHTML = head + '<div class="table-scroll"><table><thead><tr><th>素材</th><th>診斷</th>'
+    + '<th class="numCell">CTR</th><th class="numCell">CVR</th><th class="numCell">CPA</th><th class="numCell">CPM</th>'
+    + '<th class="numCell">曝光</th><th class="numCell">花費</th><th>優先處理方向</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+}
+window.__renderImproveDiag = renderImproveDiag;
+
+document.getElementById('improveBtn').addEventListener('click', async function(){
+  var btn = document.getElementById('improveBtn');
+  var out = document.getElementById('ivOutput');
+  var copyBtn = document.getElementById('ivCopyBtn');
+  var d = buildImproveList();
+  if(d.err){ out.innerHTML = '<p class="empty">' + esc(d.err) + '</p>'; return; }
+  var scope = document.getElementById('ivScope').value;
+  var pick = d.rows.filter(function(r){ return r.type !== 'keep' && r.type !== 'thin'; });
+  if(scope === 'all') pick = d.rows;
+  if(scope === 'spend') pick = d.rows.slice().sort(function(x, y){ return y.a.cost - x.a.cost; }).slice(0, 8);
+  if(!pick.length){ out.innerHTML = '<p class="empty">目前這個範圍沒有需要改善的素材——所有素材都優於基準或樣本不足。可改選「分析全部素材」。</p>'; return; }
+  var extra = String(document.getElementById('ivContext').value || '').trim();
+  var pct = function(v){ return v == null ? '-' : (v * 100).toFixed(2) + '%'; };
+  var mny = function(v){ return (v == null || !isFinite(v)) ? '-' : '$' + Math.round(v).toLocaleString(); };
+  var lines = pick.map(function(r){
+    var a = r.a;
+    return '- ' + r.name + '｜診斷=' + IV_TYPES[r.type].label
+      + '｜CTR ' + pct(a.ctr) + '｜CPC ' + mny(a.cpc) + '｜CPM ' + mny(a.cpm)
+      + '｜CVR ' + pct(a.cvr) + '｜CPA ' + mny(a.cpa)
+      + '｜曝光 ' + a.impr.toLocaleString() + '｜花費 ' + mny(a.cost)
+      + (r.tags ? '｜視覺標籤：' + r.tags : '｜（尚無視覺標籤）');
+  }).join('\n');
+  var keep = d.rows.filter(function(r){ return r.type === 'keep'; }).map(function(r){
+    return '- ' + r.name + '｜CTR ' + pct(r.a.ctr) + '｜CPA ' + mny(r.a.cpa) + (r.tags ? '｜' + r.tags : '');
+  }).join('\n');
+
+  btn.disabled = true; copyBtn.style.display = 'none';
+  setProg('ivProgBar','ivProgText','ivProgress', 1, 3, '整理素材診斷…');
+  try{
+    setProg('ivProgBar','ivProgText','ivProgress', 2, 3, 'AI 分析中…');
+    var prompt = '你是資深遊戲行銷素材優化顧問，服務對象是手遊《天堂M》的行銷團隊。'
+      + '團隊手上已經有一批正在跑的素材，請針對「這些現有素材該怎麼改」給出具體修改指示。'
+      + '重點不是想新素材（那是另一份工作），而是在既有素材的基礎上做最小幅度、最高槓桿的修改。\n\n'
+      + '═══ 整體基準線（判斷好壞都跟這條線比）═══\n'
+      + '- ' + d.base.n + ' 支素材加總｜CTR ' + pct(d.base.ctr) + '｜CPC ' + mny(d.base.cpc) + '｜CPM ' + mny(d.base.cpm)
+      + '｜CVR ' + pct(d.base.cvr) + '｜CPA ' + mny(d.base.cpa) + '｜總花費 ' + mny(d.base.cost) + '\n'
+      + '- 低樣本警示門檻：曝光 ' + d.thr.toLocaleString() + ' 以下的素材樣本不足，不應據此下改動決策\n\n'
+      + '═══ 需要改善的素材（' + pick.length + ' 支，已附工具的規則診斷）═══\n' + lines + '\n\n'
+      + '═══ 表現優於基準的素材（可作為改動時的參考母本）═══\n' + (keep || '（本批沒有明顯優於基準的素材）') + '\n\n'
+      + '診斷詞義：不夠吸睛=CTR 低於基準八成；吸睛不轉換=CTR 尚可但 CPA 高於基準兩成以上；'
+      + '投遞成本高=CPM 高於基準三成以上；中段表現=各項接近基準；樣本不足=曝光低於門檻。\n\n'
+      + (extra ? '═══ 補充限制與脈絡 ═══\n' + extra + '\n\n' : '')
+      + '請用繁體中文輸出，嚴格依下列結構，不要用 markdown 表格：\n\n'
+      + '### 一、優先處理順序\n'
+      + '把上述素材依「改動後的預期效益 ÷ 改動成本」排出處理順序，列前 3-5 支。每支寫成一行：素材名稱＋為什麼優先＋依據的指標數字。花費高但成效差的要排前面。\n\n'
+      + '### 二、逐支改善指示\n'
+      + '針對每一支需要改善的素材各寫一段，格式固定為：\n'
+      + '**素材名稱**（獨佔一行的粗體）\n'
+      + '- 問題判定：用哪個指標看出問題，跟基準差多少\n'
+      + '- 保留不動：這支素材哪些元素是有效的、不要動（若沒有明顯有效元素就寫「無」）\n'
+      + '- 具體修改：2-3 項可直接交給設計師執行的改動，要指到視覺元素（例如「前 3 秒改成實機戰鬥、人物占比拉到 40% 以上」），不要寫「優化視覺」這種空話\n'
+      + '- 驗收指標：改完之後要看哪個指標、達到多少才算成功\n\n'
+      + '### 三、可以直接複用的成功元素\n'
+      + '從表現優於基準的素材裡，抽出 2-3 個可以搬到其他素材上的具體元素，說明搬過去時要注意什麼。若沒有母本素材則說明「本批無可複用母本」。\n\n'
+      + '### 四、不建議改動的部分\n'
+      + '指出哪些素材或哪些指標差異其實是樣本不足、或屬於正常波動，改了是浪費資源。\n\n'
+      + '分析原則（很重要）：\n'
+      + '・【不要只看 CTR】CTR 只代表吸不吸睛。完整漏斗是：曝光 → CTR / CPC / CPM → CVR → CPA。\n'
+      + '・CTR 高但 CPA 也高＝吸引到錯的人，該改的是訴求一致性，不是再加強吸睛度。\n'
+      + '・CTR 普通但 CVR / CPA 好＝真正有效，不要為了 CTR 去改壞它。\n'
+      + '・CPA / CPC / CPM 越低越好，CTR / CVR 越高越好，不要弄反。\n'
+      + '・每個結論都要指出依據哪個指標；指標互相矛盾時要明講矛盾，不要只挑有利的講。\n'
+      + '・沒有視覺標籤的素材，只能依成效數字給方向性建議，請明確說明「需要補標籤才能指到具體視覺元素」，不要憑素材名稱憑空猜測畫面內容。\n\n'
+      + '輸出格式要求（很重要，會直接呈現給行銷團隊閱讀）：\n'
+      + '・【最重要】直接輸出純文字，不要包成 JSON、不要用 {} 包起來、不要加程式碼區塊（三個反引號）、不要加任何前言或結語\n'
+      + '・換行請直接換行，不要輸出字面上的 \\n\n'
+      + '・四個大段一律用「### 一、」「### 二、」「### 三、」「### 四、」開頭，不要更動段名\n'
+      + '・每個要點獨立一行，用「- 」開頭\n'
+      + '・素材名稱用 **粗體** 獨佔一行\n'
+      + '・不要用 markdown 表格、不要用巢狀縮排\n\n'
+      + '用字精準、避免空泛的行銷術語，每一項建議都要能對應回上面的數據。';
+
+    var txt = await callGemini([{ text: prompt }]);
+    setProg('ivProgBar','ivProgText','ivProgress', 3, 3, '完成');
+    window.__lastImprove = normalizeAiText(txt);
+    out.innerHTML = '<div class="nwOut">' + renderAiSections(txt) + '</div>';
+    copyBtn.style.display = '';
+  }catch(err){
+    out.innerHTML = '<p class="empty">分析失敗：' + esc(err.message || String(err)) + '</p>';
+    setProg('ivProgBar','ivProgText','ivProgress', 0, 3, '');
+  }finally{
+    btn.disabled = false;
+  }
+});
+document.getElementById('ivCopyBtn').addEventListener('click', function(){
+  var t = window.__lastImprove || '';
+  if(!t) return;
+  navigator.clipboard.writeText(t);
+  this.textContent = '已複製';
+  var b = this;
+  setTimeout(function(){ b.textContent = '複製建議'; }, 1500);
+});
 
 document.getElementById('nextWaveBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('nextWaveBtn');
@@ -5534,12 +5743,13 @@ function setAllCollapsed(flag, pageName){
 (function(){
   var pages = Array.prototype.slice.call(document.querySelectorAll('.v3page'));
   var btns = Array.prototype.slice.call(document.querySelectorAll('[data-nav]'));
-  var titles = {overview:'總覽', angles:'切角 × 賣點', detail:'素材明細', ai:'AI 視覺標籤', market:'競品對比', history:'歷史與備份'};
+  var titles = {overview:'總覽', angles:'切角 × 賣點', detail:'素材明細', ai:'AI 視覺標籤', market:'競品對比', advice:'素材建議', history:'歷史與備份'};
   function go(p){
     if(!titles[p]) p = 'overview';
     pages.forEach(function(el){ el.classList.toggle('on', el.getAttribute('data-page') === p); });
     btns.forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-nav') === p); });
     document.getElementById('v3PageTitle').textContent = titles[p];
+    if(p === 'advice' && window.__renderImproveDiag){ try{ window.__renderImproveDiag(); }catch(err){} }
     try{ localStorage.setItem('mt_v3_page', p); }catch(e){}
     window.scrollTo(0, 0);
     // 隱藏分頁裡的 canvas 尺寸為 0,切回來要主動叫 Chart.js 重新量測並重繪
